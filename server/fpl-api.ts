@@ -21,7 +21,7 @@ export class FPLAPIService {
       
       this.bootstrapData = await response.json();
       this.lastFetch = now;
-      return this.bootstrapData;
+      return this.bootstrapData!;
     } catch (error) {
       console.error("Error fetching FPL bootstrap data:", error);
       throw new Error("Failed to fetch FPL data");

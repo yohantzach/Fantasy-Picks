@@ -150,7 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamCounts.set(player.team, count + 1);
       });
       
-      for (const [teamId, count] of teamCounts) {
+      for (const [teamId, count] of Array.from(teamCounts.entries())) {
         if (count > 3) {
           return res.status(400).json({ error: "Maximum 3 players allowed from the same team" });
         }

@@ -51,11 +51,11 @@ export interface IStorage {
   createGameweekResult(result: Omit<GameweekResult, 'id' | 'createdAt'>): Promise<GameweekResult>;
   getPreviousGameweekWinners(limit?: number): Promise<GameweekResult[]>;
 
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 }
 
 export class DatabaseStorage implements IStorage {
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
