@@ -1,68 +1,80 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import Navigation from "@/components/ui/navigation";
-import FormationPitch from "@/components/ui/formation-pitch";
-import PlayerCard from "@/components/ui/player-card";
-import DeadlineTimer from "@/components/ui/deadline-timer";
-import PaymentModal from "@/components/ui/payment-modal";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, Save, Calendar } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { FPLPlayer, insertTeamSchema } from "@shared/schema";
+import { Crown, DollarSign, Users, Clock, TrendingUp, Star, Zap, Info, Plus, Minus } from "lucide-react";
+import { format } from "date-fns";
+import { PlayerStatsModal } from "@/components/player-stats-modal";
 
-type FPLPlayer = {
-  id: number;
-  web_name: string;
-  first_name: string;
-  second_name: string;
-  element_type: number;
-  team: number;
-  team_code: number;
-  now_cost: number;
-  total_points: number;
-  form: string;
-  selected_by_percent: string;
-  team_name: string;
-  team_short_name: string;
-  position_name: string;
-  price_formatted: string;
-  minutes: number;
-  goals_scored: number;
-  assists: number;
-  clean_sheets: number;
-};
+interface PlayerCardProps {
+  player: FPLPlayer;
+  isSelected: boolean;
+  onToggle: (playerId: number, isAdding: boolean) => void;
+  onShowStats: (player: FPLPlayer) => void;
+}
 
-type Team = {
-  id: number;
-  teamName: string;
-  formation: string;
-  totalValue: string;
-  players: number[];
-  captainId?: number;
-  viceCaptainId?: number;
-  totalPoints: number;
-  isLocked: boolean;
-};
-
-const formations = ["4-4-2", "4-3-3", "3-5-2", "5-4-1", "5-3-2", "4-5-1"];
+function PlayerCard({ player, isSelected, onToggle, onShowStats }: PlayerCardProps) {
+  return (
+    <Card className={`transition-all hover:shadow-md ${isSelected ? 'ring-2 ring-fpl-green bg-fpl-green/5' : ''}`}>
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <h3 className="font-semibold text-sm">{player.web_name}</h3>
+            <p className="text-xs text-muted-foreground">{player.first_name} {player.second_name}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="text-xs">
+                £{(player.now_cost / 10).toFixed(1)}m
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                {player.total_points} pts
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-xs text-muted-foreground">Form: {player.form}</span>
+              <span className="text-xs text-muted-foreground">• {player.selected_by_percent}%</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onShowStats(player)}
+              className="h-8 w-8 p-0"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant={isSelected ? "destructive" : "default"}
+              onClick={() => onToggle(player.id, !isSelected)}
+              className="h-8 w-8 p-0"
+            >
+              {isSelected ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function TeamSelection() {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [positionFilter, setPositionFilter] = useState("all");
-  const [teamFilter, setTeamFilter] = useState("all");
-  const [priceFilter, setPriceFilter] = useState("all");
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
-  const [currentFormation, setCurrentFormation] = useState("4-4-2");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showFixtures, setShowFixtures] = useState(false);
+  const [teamName, setTeamName] = useState("");
+  const [captainId, setCaptainId] = useState<number | null>(null);
+  const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<"price" | "points" | "form">("price");
+  const [filterTeam, setFilterTeam] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<FPLPlayer | null>(null);
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
@@ -70,418 +82,444 @@ export default function TeamSelection() {
   });
 
   // Fetch user's current team
-  const { data: userTeam, isLoading: teamLoading } = useQuery({
+  const { data: currentTeam } = useQuery({
     queryKey: ["/api/team/current"],
   });
 
-  // Fetch FPL players
-  const { data: players = [], isLoading: playersLoading } = useQuery({
+  // Fetch FPL data
+  const { data: players = [] } = useQuery<FPLPlayer[]>({
     queryKey: ["/api/fpl/players"],
   });
 
-  // Fetch FPL teams
   const { data: fplTeams = [] } = useQuery({
     queryKey: ["/api/fpl/teams"],
   });
 
-  // Fetch fixtures for current gameweek
-  const { data: fixtures = [] } = useQuery({
-    queryKey: ["/api/fpl/fixtures", { gameweek: currentGameweek?.gameweekNumber }],
-    enabled: !!currentGameweek?.gameweekNumber,
-  });
-
-  // Update local state when userTeam changes
-  useEffect(() => {
-    if (userTeam) {
-      setSelectedPlayers(userTeam.players || []);
-      setCurrentFormation(userTeam.formation || "4-4-2");
+  // Load current team data when available
+  useMemo(() => {
+    if (currentTeam?.players) {
+      setSelectedPlayers(currentTeam.players);
+      setTeamName(currentTeam.teamName || "");
+      setCaptainId(currentTeam.captainId || null);
+      setViceCaptainId(currentTeam.viceCaptainId || null);
     }
-  }, [userTeam]);
+  }, [currentTeam]);
 
-  // Save team mutation
-  const saveTeamMutation = useMutation({
-    mutationFn: async (teamData: any) => {
-      const response = await apiRequest("POST", "/api/team", teamData);
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
-      toast({
-        title: "Team Saved",
-        description: "Your team has been saved successfully!",
-      });
-    },
-    onError: (error: Error) => {
-      if (error.message.includes("Payment required")) {
-        setShowPaymentModal(true);
-      } else {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
+  // Filter and sort players by position
+  const getPlayersByPosition = (elementType: number) => {
+    let filteredPlayers = players.filter(p => p.element_type === elementType);
+
+    // Apply search filter
+    if (searchQuery) {
+      filteredPlayers = filteredPlayers.filter(p =>
+        p.web_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.second_name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply team filter
+    if (filterTeam !== "all") {
+      filteredPlayers = filteredPlayers.filter(p => p.team.toString() === filterTeam);
+    }
+
+    // Sort players
+    return filteredPlayers.sort((a, b) => {
+      switch (sortBy) {
+        case "price":
+          return b.now_cost - a.now_cost;
+        case "points":
+          return b.total_points - a.total_points;
+        case "form":
+          return parseFloat(b.form) - parseFloat(a.form);
+        default:
+          return b.now_cost - a.now_cost;
       }
-    },
-  });
-
-  // Check if user needs to pay
-  const needsPayment = !user?.isAdmin && !user?.hasPaid;
-
-  // Filter players
-  const filteredPlayers = players.filter((player: FPLPlayer) => {
-    const matchesSearch = player.web_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         player.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         player.second_name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesPosition = positionFilter === "all" || player.element_type === parseInt(positionFilter);
-    
-    const matchesTeam = teamFilter === "all" || player.team === parseInt(teamFilter);
-    
-    const matchesPrice = priceFilter === "all" || 
-      (priceFilter === "under5" && player.now_cost < 50) ||
-      (priceFilter === "5to8" && player.now_cost >= 50 && player.now_cost < 80) ||
-      (priceFilter === "8to12" && player.now_cost >= 80 && player.now_cost < 120) ||
-      (priceFilter === "over12" && player.now_cost >= 120);
-    
-    return matchesSearch && matchesPosition && matchesTeam && matchesPrice;
-  });
-
-  // Calculate budget info
-  const selectedPlayerObjects = players.filter((p: FPLPlayer) => selectedPlayers.includes(p.id));
-  const totalSpent = selectedPlayerObjects.reduce((sum: number, p: FPLPlayer) => sum + p.now_cost, 0);
-  const budgetRemaining = 1000 - totalSpent; // 100.0m = 1000 in API units
-
-  // Validate team composition
-  const getPositionCounts = () => {
-    const counts = { GKP: 0, DEF: 0, MID: 0, FWD: 0 };
-    selectedPlayerObjects.forEach(player => {
-      counts[player.position_name as keyof typeof counts]++;
     });
-    return counts;
   };
 
-  const positionCounts = getPositionCounts();
-  const isValidTeam = positionCounts.GKP === 1 && 
-                     positionCounts.DEF >= 3 && positionCounts.DEF <= 5 &&
-                     positionCounts.MID >= 2 && positionCounts.MID <= 5 &&
-                     positionCounts.FWD >= 1 && positionCounts.FWD <= 3 &&
-                     selectedPlayers.length === 11;
+  const totalCost = useMemo(() => {
+    const selectedPlayerObjs = players.filter(p => selectedPlayers.includes(p.id));
+    return selectedPlayerObjs.reduce((sum, p) => sum + p.now_cost, 0);
+  }, [selectedPlayers, players]);
 
-  const handlePlayerToggle = (playerId: number, isAdding: boolean) => {
+  const remainingBudget = 1000 - totalCost; // 100.0m in API units
+
+  // Validate team constraints
+  const validatePlayerSelection = (playerId: number, isAdding: boolean) => {
+    const player = players.find(p => p.id === playerId);
+    if (!player) return false;
+
     if (isAdding) {
+      // Check if already at 11 players
       if (selectedPlayers.length >= 11) {
         toast({
           title: "Team Full",
           description: "You can only select 11 players",
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
-      const player = players.find((p: FPLPlayer) => p.id === playerId);
-      if (!player) return;
-
-      if (budgetRemaining < player.now_cost) {
+      // Check budget
+      if (player.now_cost > remainingBudget) {
         toast({
           title: "Insufficient Budget",
-          description: "You don't have enough budget for this player",
+          description: `You need £${((player.now_cost - remainingBudget) / 10).toFixed(1)}m more`,
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
-      // Check team constraint (max 3 players from same team)
-      const sameTeamPlayers = selectedPlayerObjects.filter(p => p.team === player.team);
-      if (sameTeamPlayers.length >= 3) {
+      // Check position limits
+      const currentPositionCount = selectedPlayers.filter(id => {
+        const p = players.find(p => p.id === id);
+        return p?.element_type === player.element_type;
+      }).length;
+
+      const maxForPosition = player.element_type === 1 ? 2 : player.element_type === 2 ? 5 : player.element_type === 3 ? 5 : 3;
+      
+      if (currentPositionCount >= maxForPosition) {
+        const positionName = player.element_type === 1 ? "goalkeepers" : 
+                           player.element_type === 2 ? "defenders" :
+                           player.element_type === 3 ? "midfielders" : "forwards";
         toast({
-          title: "Team Limit Exceeded",
-          description: "Maximum 3 players allowed from the same team",
+          title: "Position Limit Reached",
+          description: `You can only select ${maxForPosition} ${positionName}`,
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
-      setSelectedPlayers([...selectedPlayers, playerId]);
+      // Check team limit (max 3 from same team)
+      const sameTeamCount = selectedPlayers.filter(id => {
+        const p = players.find(p => p.id === id);
+        return p?.team === player.team;
+      }).length;
+
+      if (sameTeamCount >= 3) {
+        toast({
+          title: "Team Limit Reached",
+          description: "You can only select 3 players from the same team",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handlePlayerToggle = (playerId: number, isAdding: boolean) => {
+    if (!validatePlayerSelection(playerId, isAdding)) return;
+
+    if (isAdding) {
+      setSelectedPlayers(prev => [...prev, playerId]);
     } else {
-      setSelectedPlayers(selectedPlayers.filter(id => id !== playerId));
+      setSelectedPlayers(prev => prev.filter(id => id !== playerId));
+      // Remove captain/vice-captain if deselected
+      if (captainId === playerId) setCaptainId(null);
+      if (viceCaptainId === playerId) setViceCaptainId(null);
     }
   };
 
-  const handleSaveTeam = () => {
-    if (needsPayment) {
-      setShowPaymentModal(true);
-      return;
-    }
-
-    if (!isValidTeam) {
+  const saveTeamMutation = useMutation({
+    mutationFn: async (teamData: any) => {
+      const response = await apiRequest("POST", "/api/team/save", teamData);
+      return response.json();
+    },
+    onSuccess: () => {
       toast({
-        title: "Invalid Team",
-        description: "Please select a valid team formation with 11 players",
+        title: "Team Saved",
+        description: "Your team has been saved successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save team",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveTeam = () => {
+    if (selectedPlayers.length !== 11) {
+      toast({
+        title: "Incomplete Team",
+        description: "You must select exactly 11 players",
         variant: "destructive",
       });
       return;
     }
 
-    const teamData = {
-      teamName: userTeam?.teamName || `${user?.name}'s Team`,
-      formation: currentFormation,
+    if (!captainId || !viceCaptainId) {
+      toast({
+        title: "Missing Captain",
+        description: "You must select a captain and vice-captain",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!teamName.trim()) {
+      toast({
+        title: "Team Name Required",
+        description: "Please enter a team name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const teamData = insertTeamSchema.parse({
+      teamName: teamName.trim(),
+      formation: "4-4-2",
       players: selectedPlayers,
-      captainId: userTeam?.captainId,
-      viceCaptainId: userTeam?.viceCaptainId,
-    };
+      captainId,
+      viceCaptainId,
+    });
 
     saveTeamMutation.mutate(teamData);
   };
 
-  const isDeadlinePassed = currentGameweek && new Date() > new Date(currentGameweek.deadline);
+  const getPositionName = (elementType: number) => {
+    switch (elementType) {
+      case 1: return "Goalkeepers";
+      case 2: return "Defenders";
+      case 3: return "Midfielders";
+      case 4: return "Forwards";
+      default: return "Unknown";
+    }
+  };
 
-  if (playersLoading || teamLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
-        <Navigation />
-        <div className="flex items-center justify-center min-h-[80vh]">
-          <div className="text-white text-xl">Loading...</div>
-        </div>
-      </div>
-    );
-  }
+  const isDeadlinePassed = currentGameweek?.deadline ? new Date() > new Date(currentGameweek.deadline) : false;
+  const isLocked = currentTeam?.isLocked || isDeadlinePassed;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
-      <Navigation />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Deadline Timer */}
-        {currentGameweek && (
-          <DeadlineTimer 
-            deadline={currentGameweek.deadline} 
-            gameweek={currentGameweek.gameweekNumber} 
-          />
-        )}
-
-        {/* Budget & Team Info */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="glass-card border-white/20">
-            <CardContent className="p-4">
-              <div className="text-white/60 text-sm">Budget Remaining</div>
-              <div className={`text-2xl font-bold ${budgetRemaining < 0 ? 'text-red-400' : 'text-fpl-green'}`}>
-                £{(budgetRemaining / 10).toFixed(1)}m
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card border-white/20">
-            <CardContent className="p-4">
-              <div className="text-white/60 text-sm">Players Selected</div>
-              <div className={`text-2xl font-bold ${selectedPlayers.length === 11 ? 'text-fpl-green' : 'text-white'}`}>
-                {selectedPlayers.length}/11
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card border-white/20">
-            <CardContent className="p-4">
-              <div className="text-white/60 text-sm">Formation</div>
-              <div className="text-2xl font-bold text-white">
-                {currentFormation}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card border-white/20">
-            <CardContent className="p-4">
-              <div className="text-white/60 text-sm">Gameweek</div>
-              <div className="text-2xl font-bold text-fpl-green">
-                {currentGameweek?.gameweekNumber || "21"}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Formation & Pitch */}
-        <FormationPitch 
-          selectedPlayers={selectedPlayerObjects}
-          formation={currentFormation}
-          onFormationChange={setCurrentFormation}
-        />
-
-        {/* Player Selection */}
-        <Card className="glass-card border-white/20 mt-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-              <h3 className="text-white text-lg font-semibold mb-4 sm:mb-0 flex items-center gap-2">
-                <Filter className="h-5 w-5 text-fpl-green" />
-                Select Players
-              </h3>
-              
-              {/* Toggle Fixtures Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFixtures(!showFixtures)}
-                className="mb-4 sm:mb-0 bg-white/20 border-white/30 text-white hover:bg-white/30"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                {showFixtures ? "Hide Fixtures" : "Show Fixtures"}
-              </Button>
-            </div>
-
-            {/* Fixtures Preview */}
-            {showFixtures && (
-              <div className="mb-6 p-4 bg-white/10 rounded-lg">
-                <h4 className="text-white font-medium mb-3">Gameweek {currentGameweek?.gameweekNumber} Fixtures</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {fixtures.slice(0, 6).map((fixture: any) => (
-                    <div key={fixture.id} className="bg-white/10 rounded-lg p-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white">{fixture.team_h_short}</span>
-                        <span className="text-white/60">vs</span>
-                        <span className="text-white">{fixture.team_a_short}</span>
-                      </div>
-                      <div className="flex justify-center gap-2 mt-1">
-                        <span className={`w-4 h-4 rounded text-xs flex items-center justify-center text-white font-bold ${
-                          fixture.team_h_difficulty <= 2 ? 'bg-green-500' : 
-                          fixture.team_h_difficulty === 3 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}>
-                          {fixture.team_h_difficulty}
-                        </span>
-                        <span className={`w-4 h-4 rounded text-xs flex items-center justify-center text-white font-bold ${
-                          fixture.team_a_difficulty <= 2 ? 'bg-green-500' : 
-                          fixture.team_a_difficulty === 3 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}>
-                          {fixture.team_a_difficulty}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              <Select value={positionFilter} onValueChange={setPositionFilter}>
-                <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white">
-                  <SelectValue placeholder="Position" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Positions</SelectItem>
-                  <SelectItem value="1">Goalkeepers</SelectItem>
-                  <SelectItem value="2">Defenders</SelectItem>
-                  <SelectItem value="3">Midfielders</SelectItem>
-                  <SelectItem value="4">Forwards</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white">
-                  <SelectValue placeholder="Team" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Teams</SelectItem>
-                  {fplTeams.map((team: any) => (
-                    <SelectItem key={team.id} value={team.id.toString()}>
-                      {team.short_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Select value={priceFilter} onValueChange={setPriceFilter}>
-                <SelectTrigger className="w-32 bg-white/20 border-white/30 text-white">
-                  <SelectValue placeholder="Price" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Prices</SelectItem>
-                  <SelectItem value="under5">Under £5.0m</SelectItem>
-                  <SelectItem value="5to8">£5.0m - £8.0m</SelectItem>
-                  <SelectItem value="8to12">£8.0m - £12.0m</SelectItem>
-                  <SelectItem value="over12">Over £12.0m</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Search Bar */}
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 h-4 w-4" />
-              <Input
-                placeholder="Search players..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 pl-10 focus:ring-fpl-green focus:border-fpl-green"
-              />
-            </div>
-
-            {/* Team Composition Status */}
-            <div className="mb-6 p-4 bg-white/10 rounded-lg">
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div className={`flex items-center gap-2 ${positionCounts.GKP === 1 ? 'text-green-400' : 'text-red-400'}`}>
-                  <Badge variant="outline" className="border-current">GKP</Badge>
-                  <span>{positionCounts.GKP}/1</span>
-                </div>
-                <div className={`flex items-center gap-2 ${positionCounts.DEF >= 3 && positionCounts.DEF <= 5 ? 'text-green-400' : 'text-red-400'}`}>
-                  <Badge variant="outline" className="border-current">DEF</Badge>
-                  <span>{positionCounts.DEF}/3-5</span>
-                </div>
-                <div className={`flex items-center gap-2 ${positionCounts.MID >= 2 && positionCounts.MID <= 5 ? 'text-green-400' : 'text-red-400'}`}>
-                  <Badge variant="outline" className="border-current">MID</Badge>
-                  <span>{positionCounts.MID}/2-5</span>
-                </div>
-                <div className={`flex items-center gap-2 ${positionCounts.FWD >= 1 && positionCounts.FWD <= 3 ? 'text-green-400' : 'text-red-400'}`}>
-                  <Badge variant="outline" className="border-current">FWD</Badge>
-                  <span>{positionCounts.FWD}/1-3</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Player Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredPlayers.slice(0, 20).map((player: FPLPlayer) => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  isSelected={selectedPlayers.includes(player.id)}
-                  onToggle={handlePlayerToggle}
-                  disabled={isDeadlinePassed || userTeam?.isLocked}
-                />
-              ))}
-            </div>
-
-            {/* Load More */}
-            {filteredPlayers.length > 20 && (
-              <div className="text-center mt-6">
-                <Button variant="outline" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
-                  Load More Players
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Save Team Button */}
-        <div className="text-center mt-6">
-          <Button
-            onClick={handleSaveTeam}
-            disabled={saveTeamMutation.isPending || userTeam?.isLocked || isDeadlinePassed || !isValidTeam}
-            className="bg-fpl-green hover:bg-green-600 text-white px-8 py-4 text-lg font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="h-5 w-5 mr-2" />
-            {userTeam?.isLocked ? "Team Locked" : 
-             isDeadlinePassed ? "Deadline Passed" :
-             "Save Team for Gameweek"}
-          </Button>
-          <p className="text-white/60 text-sm mt-2">
-            {isValidTeam ? "Team will be locked at deadline" : 
-             `Invalid team: Need ${11 - selectedPlayers.length} more players`}
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text">Team Selection</h1>
+          <p className="text-muted-foreground">
+            {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber}` : "Loading..."}
           </p>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold text-fpl-green">
+            £{(remainingBudget / 10).toFixed(1)}m
+          </div>
+          <p className="text-sm text-muted-foreground">Budget Remaining</p>
         </div>
       </div>
 
-      {/* Payment Modal */}
-      <PaymentModal 
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onPaymentSuccess={() => {
-          setShowPaymentModal(false);
-          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        }}
+      {/* Deadline warning */}
+      {currentGameweek?.deadline && (
+        <Card className={`border-l-4 ${isDeadlinePassed ? 'border-l-red-500 bg-red-50 dark:bg-red-950/20' : 'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950/20'}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-yellow-600" />
+              <span className="font-medium">
+                {isDeadlinePassed ? "Deadline Passed" : "Deadline"}
+              </span>
+              <span className="text-muted-foreground">
+                {format(new Date(currentGameweek.deadline), "PPP 'at' p")}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Player Selection */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Players</CardTitle>
+              <div className="flex gap-4 flex-wrap">
+                <Input
+                  placeholder="Search players..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="points">Points</SelectItem>
+                    <SelectItem value="form">Form</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterTeam} onValueChange={setFilterTeam}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teams</SelectItem>
+                    {fplTeams.map((team: any) => (
+                      <SelectItem key={team.id} value={team.id.toString()}>
+                        {team.short_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="1" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="1">GK</TabsTrigger>
+                  <TabsTrigger value="2">DEF</TabsTrigger>
+                  <TabsTrigger value="3">MID</TabsTrigger>
+                  <TabsTrigger value="4">FWD</TabsTrigger>
+                </TabsList>
+                
+                {[1, 2, 3, 4].map((position) => (
+                  <TabsContent key={position} value={position.toString()}>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">{getPositionName(position)}</h3>
+                      <div className="grid gap-2 max-h-96 overflow-y-auto">
+                        {getPlayersByPosition(position).map((player) => (
+                          <PlayerCard
+                            key={player.id}
+                            player={player}
+                            isSelected={selectedPlayers.includes(player.id)}
+                            onToggle={handlePlayerToggle}
+                            onShowStats={setSelectedPlayerForStats}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Team Overview */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Team</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Input
+                  placeholder="Enter team name"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  disabled={isLocked}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Selected Players ({selectedPlayers.length}/11)</div>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {selectedPlayers.map((playerId) => {
+                    const player = players.find(p => p.id === playerId);
+                    if (!player) return null;
+                    return (
+                      <div key={playerId} className="flex justify-between items-center text-sm">
+                        <span>{player.web_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span>£{(player.now_cost / 10).toFixed(1)}m</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handlePlayerToggle(playerId, false)}
+                            className="h-6 w-6 p-0"
+                            disabled={isLocked}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Captain</div>
+                <Select value={captainId?.toString() || ""} onValueChange={(value) => setCaptainId(Number(value))} disabled={isLocked}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select captain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedPlayers.map((playerId) => {
+                      const player = players.find(p => p.id === playerId);
+                      if (!player) return null;
+                      return (
+                        <SelectItem key={playerId} value={playerId.toString()}>
+                          {player.web_name}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Vice Captain</div>
+                <Select value={viceCaptainId?.toString() || ""} onValueChange={(value) => setViceCaptainId(Number(value))} disabled={isLocked}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vice captain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedPlayers.filter(id => id !== captainId).map((playerId) => {
+                      const player = players.find(p => p.id === playerId);
+                      if (!player) return null;
+                      return (
+                        <SelectItem key={playerId} value={playerId.toString()}>
+                          {player.web_name}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Total Cost:</span>
+                  <span>£{(totalCost / 10).toFixed(1)}m</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Budget Remaining:</span>
+                  <span className="text-fpl-green">£{(remainingBudget / 10).toFixed(1)}m</span>
+                </div>
+              </div>
+
+              {!isLocked && (
+                <Button
+                  onClick={handleSaveTeam}
+                  className="w-full"
+                  disabled={saveTeamMutation.isPending || selectedPlayers.length !== 11}
+                >
+                  {saveTeamMutation.isPending ? "Saving..." : "Save Team"}
+                </Button>
+              )}
+
+              {isLocked && (
+                <div className="text-center text-sm text-muted-foreground">
+                  Team locked - deadline passed
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Player Stats Modal */}
+      <PlayerStatsModal
+        player={selectedPlayerForStats}
+        isOpen={!!selectedPlayerForStats}
+        onClose={() => setSelectedPlayerForStats(null)}
       />
     </div>
   );

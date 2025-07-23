@@ -29,7 +29,7 @@ export default function Fixtures() {
 
   // Fetch fixtures for current gameweek
   const { data: fixtures = [], isLoading } = useQuery({
-    queryKey: ["/api/fpl/fixtures", { gameweek: currentGameweek?.gameweekNumber }],
+    queryKey: ["/api/fpl/fixtures", currentGameweek?.gameweekNumber],
     enabled: !!currentGameweek?.gameweekNumber,
   });
 

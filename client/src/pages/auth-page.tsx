@@ -103,12 +103,7 @@ export default function AuthPage() {
                   )}
                 </div>
                 
-                {/* Admin Login Note */}
-                <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-3">
-                  <p className="text-blue-200 text-sm">
-                    <strong>Admin Access:</strong> admin@gmail.com / Ezmoney123
-                  </p>
-                </div>
+
 
                 <Button
                   type="submit"

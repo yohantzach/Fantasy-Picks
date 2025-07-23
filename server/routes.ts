@@ -185,6 +185,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboard/:gameweekId", async (req, res) => {
     try {
       const gameweekId = parseInt(req.params.gameweekId);
+      if (isNaN(gameweekId)) {
+        return res.status(400).json({ error: "Invalid gameweek ID" });
+      }
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
       
       const leaderboard = await storage.getGameweekLeaderboard(gameweekId, limit);
