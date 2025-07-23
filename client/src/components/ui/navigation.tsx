@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import DeadlineTimer from "./deadline-timer";
 import { Volleyball, User, LogOut, Menu, X, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -72,18 +71,16 @@ export default function Navigation() {
             {/* Deadline Timer - Desktop */}
             {currentGameweek && (
               <div className="hidden lg:block">
-                <DeadlineTimer 
-                  deadline={currentGameweek.deadline} 
-                  gameweek={currentGameweek.gameweekNumber}
-                  compact 
-                />
+                <div className="text-sm text-white/80">
+                  Gameweek {(currentGameweek as any).gameweekNumber}
+                </div>
               </div>
             )}
 
             {/* User Info */}
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
-                <div className="text-white text-sm font-medium">{user?.name}</div>
+                <div className="text-white text-sm font-medium">{(user as any)?.email}</div>
                 <div className="flex items-center gap-2 text-xs">
                   {user?.isAdmin && (
                     <Badge variant="outline" className="border-yellow-400 text-yellow-400 text-xs px-1">
@@ -158,7 +155,7 @@ export default function Navigation() {
             {/* Mobile User Info */}
             <div className="mt-4 pt-4 border-t border-white/10">
               <div className="px-4 py-2 bg-white/10 rounded-lg">
-                <div className="text-white font-medium">{user?.name}</div>
+                <div className="text-white font-medium">{(user as any)?.email}</div>
                 <div className="flex items-center gap-2 text-xs mt-1">
                   {user?.isAdmin && (
                     <Badge variant="outline" className="border-yellow-400 text-yellow-400 text-xs">
@@ -174,13 +171,12 @@ export default function Navigation() {
               </div>
             </div>
             
-            {/* Mobile Deadline Timer */}
+            {/* Mobile Gameweek Info */}
             {currentGameweek && (
               <div className="mt-4 pt-4 border-t border-white/10">
-                <DeadlineTimer 
-                  deadline={currentGameweek.deadline} 
-                  gameweek={currentGameweek.gameweekNumber}
-                />
+                <div className="text-sm text-white/80">
+                  Gameweek {(currentGameweek as any).gameweekNumber}
+                </div>
               </div>
             )}
           </div>

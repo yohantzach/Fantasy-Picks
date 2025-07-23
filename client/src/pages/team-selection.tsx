@@ -397,8 +397,8 @@ export default function TeamSelection() {
         /* Player Selection Table */
         <div className="space-y-6">
           <PlayerSelectionTable
-            players={players}
-            fplTeams={fplTeams}
+            players={players || []}
+            fplTeams={fplTeams || []}
             elementType={showPlayerTable}
             selectedPlayers={selectedPlayers}
             onPlayerToggle={handlePlayerToggle}
@@ -409,11 +409,14 @@ export default function TeamSelection() {
       )}
 
       {/* Player Stats Modal */}
-      <PlayerStatsModal
-        player={selectedPlayerForStats}
-        isOpen={!!selectedPlayerForStats}
-        onClose={() => setSelectedPlayerForStats(null)}
-      />
+      {selectedPlayerForStats && (
+        <PlayerStatsModal
+          player={selectedPlayerForStats}
+          isOpen={!!selectedPlayerForStats}
+          onClose={() => setSelectedPlayerForStats(null)}
+        />
+      )}
+      </div>
     </div>
   );
 }
