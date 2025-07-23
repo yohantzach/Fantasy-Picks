@@ -32,6 +32,7 @@ export interface IStorage {
   getCurrentGameweek(): Promise<Gameweek | undefined>;
   getGameweek(gameweekNumber: number): Promise<Gameweek | undefined>;
   createGameweek(gameweekNumber: number, deadline: Date): Promise<Gameweek>;
+  updateGameweekDeadline(gameweekId: number, deadline: Date): Promise<void>;
   updateGameweekStatus(gameweekId: number, isCompleted: boolean): Promise<void>;
 
   // Team management
@@ -125,6 +126,13 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(gameweeks)
       .set({ isCompleted, isActive: !isCompleted })
+      .where(eq(gameweeks.id, gameweekId));
+  }
+
+  async updateGameweekDeadline(gameweekId: number, deadline: Date): Promise<void> {
+    await db
+      .update(gameweeks)
+      .set({ deadline })
       .where(eq(gameweeks.id, gameweekId));
   }
 

@@ -1,166 +1,353 @@
-import { FPLBootstrapData, FPLPlayer, FPLTeam, FPLFixture } from "@shared/schema";
+// FPL API service with hourly caching (max 24 calls per day)
 
-const FPL_BASE_URL = "https://fantasy.premierleague.com/api";
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
 
-export class FPLAPIService {
-  private bootstrapData: FPLBootstrapData | null = null;
-  private lastFetch: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+interface FPLBootstrapData {
+  events: Array<{
+    id: number;
+    name: string;
+    deadline_time: string;
+    is_current: boolean;
+    is_next: boolean;
+    finished: boolean;
+  }>;
+  game_settings: {
+    league_join_private_max: number;
+    league_join_public_max: number;
+    league_max_size_public_classic: number;
+    league_max_size_public_h2h: number;
+    league_max_size_private_h2h: number;
+    league_max_ko_rounds_private_h2h: number;
+    league_prefix_public: string;
+    league_points_h2h_win: number;
+    league_points_h2h_lose: number;
+    league_points_h2h_draw: number;
+    league_ko_first_instead_of_random: boolean;
+    cup_start_event_id: number;
+    cup_stop_event_id: number;
+    cup_qualifying_method: string;
+    cup_type: string;
+    squad_squadplay: number;
+    squad_squadsize: number;
+    squad_team_limit: number;
+    squad_total_spend: number;
+    ui_currency_multiplier: number;
+    ui_use_special_shirts: boolean;
+    ui_special_shirt_exclusions: any[];
+    stats_form_days: number;
+    sys_vice_captain_enabled: boolean;
+    transfers_cap: number;
+    transfers_sell_on_fee: number;
+    league_h2h_tiebreak_stats: string[];
+    timezone: string;
+  };
+  phases: Array<{
+    id: number;
+    name: string;
+    start_event: number;
+    stop_event: number;
+  }>;
+  teams: Array<{
+    code: number;
+    draw: number;
+    form: string | null;
+    id: number;
+    loss: number;
+    name: string;
+    played: number;
+    points: number;
+    position: number;
+    short_name: string;
+    strength: number;
+    team_division: number | null;
+    unavailable: boolean;
+    win: number;
+    strength_overall_home: number;
+    strength_overall_away: number;
+    strength_attack_home: number;
+    strength_attack_away: number;
+    strength_defence_home: number;
+    strength_defence_away: number;
+    pulse_id: number;
+  }>;
+  total_players: number;
+  elements: Array<{
+    chance_of_playing_next_round: number | null;
+    chance_of_playing_this_round: number | null;
+    code: number;
+    cost_change_event: number;
+    cost_change_event_fall: number;
+    cost_change_start: number;
+    cost_change_start_fall: number;
+    dreamteam_count: number;
+    element_type: number;
+    ep_next: string | null;
+    ep_this: string | null;
+    event_points: number;
+    first_name: string;
+    form: string;
+    id: number;
+    in_dreamteam: boolean;
+    news: string;
+    news_added: string | null;
+    now_cost: number;
+    photo: string;
+    points_per_game: string;
+    second_name: string;
+    selected_by_percent: string;
+    special: boolean;
+    squad_number: number | null;
+    status: string;
+    team: number;
+    team_code: number;
+    total_points: number;
+    transfers_in: number;
+    transfers_in_event: number;
+    transfers_out: number;
+    transfers_out_event: number;
+    value_form: string;
+    value_season: string;
+    web_name: string;
+    minutes: number;
+    goals_scored: number;
+    assists: number;
+    clean_sheets: number;
+    goals_conceded: number;
+    own_goals: number;
+    penalties_saved: number;
+    penalties_missed: number;
+    yellow_cards: number;
+    red_cards: number;
+    saves: number;
+    bonus: number;
+    bps: number;
+    influence: string;
+    creativity: string;
+    threat: string;
+    ict_index: string;
+    starts: number;
+    expected_goals: string;
+    expected_assists: string;
+    expected_goal_involvements: string;
+    expected_goals_conceded: string;
+    influence_rank: number;
+    influence_rank_type: number;
+    creativity_rank: number;
+    creativity_rank_type: number;
+    threat_rank: number;
+    threat_rank_type: number;
+    ict_index_rank: number;
+    ict_index_rank_type: number;
+    corners_and_indirect_freekicks_order: number | null;
+    corners_and_indirect_freekicks_text: string;
+    direct_freekicks_order: number | null;
+    direct_freekicks_text: string;
+    penalties_order: number | null;
+    penalties_text: string;
+    expected_goals_per_90: number;
+    saves_per_90: number;
+    expected_assists_per_90: number;
+    expected_goal_involvements_per_90: number;
+    expected_goals_conceded_per_90: number;
+    goals_conceded_per_90: number;
+    now_cost_rank: number;
+    now_cost_rank_type: number;
+    form_rank: number;
+    form_rank_type: number;
+    points_per_game_rank: number;
+    points_per_game_rank_type: number;
+    selected_rank: number;
+    selected_rank_type: number;
+    starts_per_90: number;
+    clean_sheets_per_90: number;
+  }>;
+  element_stats: Array<{
+    label: string;
+    name: string;
+  }>;
+  element_types: Array<{
+    id: number;
+    plural_name: string;
+    plural_name_short: string;
+    singular_name: string;
+    singular_name_short: string;
+    squad_select: number;
+    squad_min_play: number;
+    squad_max_play: number;
+    ui_shirt_specific: boolean;
+    sub_positions_locked: number[];
+    element_count: number;
+  }>;
+}
 
-  async getBootstrapData(): Promise<FPLBootstrapData> {
+interface FPLFixture {
+  code: number;
+  event: number;
+  finished: boolean;
+  finished_provisional: boolean;
+  id: number;
+  kickoff_time: string;
+  minutes: number;
+  provisional_start_time: boolean;
+  started: boolean;
+  team_a: number;
+  team_a_score: number | null;
+  team_h: number;
+  team_h_score: number | null;
+  stats: any[];
+  team_h_difficulty: number;
+  team_a_difficulty: number;
+  pulse_id: number;
+}
+
+class FPLAPIService {
+  private cache: Map<string, CacheEntry> = new Map();
+  private readonly CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+  private readonly BASE_URL = 'https://fantasy.premierleague.com/api';
+  private callCount = 0;
+  private lastResetDate = new Date().toDateString();
+
+  private resetDailyCallCount() {
+    const today = new Date().toDateString();
+    if (today !== this.lastResetDate) {
+      this.callCount = 0;
+      this.lastResetDate = today;
+    }
+  }
+
+  private canMakeAPICall(): boolean {
+    this.resetDailyCallCount();
+    return this.callCount < 24;
+  }
+
+  private async makeAPICall(endpoint: string): Promise<any> {
+    if (!this.canMakeAPICall()) {
+      throw new Error('Daily API call limit exceeded (24 calls per day)');
+    }
+
+    const cacheKey = endpoint;
+    const cached = this.cache.get(cacheKey);
     const now = Date.now();
-    if (this.bootstrapData && (now - this.lastFetch) < this.CACHE_DURATION) {
-      return this.bootstrapData;
+
+    // Return cached data if it's still valid
+    if (cached && (now - cached.timestamp < this.CACHE_DURATION)) {
+      console.log(`Serving ${endpoint} from cache`);
+      return cached.data;
     }
 
     try {
-      const response = await fetch(`${FPL_BASE_URL}/bootstrap-static/`);
-      if (!response.ok) {
-        throw new Error(`FPL API error: ${response.status}`);
-      }
+      console.log(`Making API call to ${endpoint} (${this.callCount + 1}/24 calls today)`);
+      const response = await fetch(`${this.BASE_URL}${endpoint}`);
       
-      this.bootstrapData = await response.json();
-      this.lastFetch = now;
-      return this.bootstrapData!;
+      if (!response.ok) {
+        throw new Error(`FPL API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Update cache
+      this.cache.set(cacheKey, {
+        data,
+        timestamp: now
+      });
+
+      this.callCount++;
+      console.log(`Successfully cached ${endpoint}. API calls today: ${this.callCount}/24`);
+      
+      return data;
     } catch (error) {
-      console.error("Error fetching FPL bootstrap data:", error);
-      throw new Error("Failed to fetch FPL data");
+      console.error(`Failed to fetch ${endpoint}:`, error);
+      throw error;
     }
   }
 
-  async getPlayers(): Promise<FPLPlayer[]> {
-    const data = await this.getBootstrapData();
-    return data.elements;
-  }
-
-  async getTeams(): Promise<FPLTeam[]> {
-    const data = await this.getBootstrapData();
-    return data.teams;
-  }
-
-  async getPlayer(playerId: number): Promise<FPLPlayer | undefined> {
-    const players = await this.getPlayers();
-    return players.find(p => p.id === playerId);
+  async getBootstrapData(): Promise<FPLBootstrapData> {
+    return this.makeAPICall('/bootstrap-static/');
   }
 
   async getFixtures(gameweek?: number): Promise<FPLFixture[]> {
-    try {
-      let url = `${FPL_BASE_URL}/fixtures/`;
-      if (gameweek) {
-        url += `?event=${gameweek}`;
-      }
+    const endpoint = gameweek ? `/fixtures/?event=${gameweek}` : '/fixtures/';
+    return this.makeAPICall(endpoint);
+  }
+
+  async getCurrentGameweek(): Promise<any> {
+    const bootstrap = await this.getBootstrapData();
+    const currentEvent = bootstrap.events.find(event => event.is_current) || 
+                        bootstrap.events.find(event => event.is_next) ||
+                        bootstrap.events[0];
+    
+    return currentEvent;
+  }
+
+  async getPlayers(): Promise<any[]> {
+    const bootstrap = await this.getBootstrapData();
+    return bootstrap.elements;
+  }
+
+  async getTeams(): Promise<any[]> {
+    const bootstrap = await this.getBootstrapData();
+    return bootstrap.teams;
+  }
+
+  async getElementTypes(): Promise<any[]> {
+    const bootstrap = await this.getBootstrapData();
+    return bootstrap.element_types;
+  }
+
+  // Get gameweek deadline (2 hours before first match)
+  async getGameweekDeadline(gameweek: number): Promise<string> {
+    const fixtures = await this.getFixtures(gameweek);
+    
+    if (fixtures.length === 0) {
+      throw new Error(`No fixtures found for gameweek ${gameweek}`);
+    }
+
+    // Find the earliest kickoff time for the gameweek
+    const earliestFixture = fixtures.reduce((earliest, fixture) => {
+      const fixtureKickoff = new Date(fixture.kickoff_time);
+      const earliestKickoff = new Date(earliest.kickoff_time);
+      return fixtureKickoff < earliestKickoff ? fixture : earliest;
+    });
+
+    // Deadline is 2 hours before the first match
+    const deadline = new Date(earliestFixture.kickoff_time);
+    deadline.setHours(deadline.getHours() - 2);
+    
+    return deadline.toISOString();
+  }
+
+  // Enhanced fixtures with team names
+  async getFixturesWithTeamNames(gameweek?: number): Promise<any[]> {
+    const fixtures = await this.getFixtures(gameweek);
+    const teams = await this.getTeams();
+    
+    return fixtures.map(fixture => {
+      const homeTeam = teams.find(team => team.id === fixture.team_h);
+      const awayTeam = teams.find(team => team.id === fixture.team_a);
       
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`FPL API error: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching FPL fixtures:", error);
-      throw new Error("Failed to fetch fixtures");
-    }
+      return {
+        ...fixture,
+        team_h_name: homeTeam?.name || 'Unknown',
+        team_a_name: awayTeam?.name || 'Unknown',
+        team_h_short: homeTeam?.short_name || 'UNK',
+        team_a_short: awayTeam?.short_name || 'UNK'
+      };
+    });
   }
 
-  async getCurrentGameweek(): Promise<number> {
-    const data = await this.getBootstrapData();
-    const currentEvent = data.events.find(event => event.is_current);
-    return currentEvent ? currentEvent.id : 1;
-  }
-
-  async getGameweekDeadline(gameweek: number): Promise<Date | null> {
-    const data = await this.getBootstrapData();
-    const event = data.events.find(e => e.id === gameweek);
-    return event ? new Date(event.deadline_time) : null;
-  }
-
-  async getGameweekLiveData(gameweek: number): Promise<any> {
-    try {
-      const response = await fetch(`${FPL_BASE_URL}/event/${gameweek}/live/`);
-      if (!response.ok) {
-        throw new Error(`FPL API error: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching live gameweek data:", error);
-      throw new Error("Failed to fetch live data");
-    }
-  }
-
-  calculatePlayerPoints(playerStats: any): number {
-    let points = 0;
-    
-    // Minutes played (2 points for 60+ minutes, 1 point for 1-59 minutes)
-    if (playerStats.minutes >= 60) points += 2;
-    else if (playerStats.minutes > 0) points += 1;
-    
-    // Goals scored (varies by position)
-    const position = playerStats.element_type;
-    if (position === 1) { // Goalkeeper
-      points += playerStats.goals_scored * 6;
-    } else if (position === 2) { // Defender
-      points += playerStats.goals_scored * 6;
-    } else if (position === 3) { // Midfielder
-      points += playerStats.goals_scored * 5;
-    } else if (position === 4) { // Forward
-      points += playerStats.goals_scored * 4;
-    }
-    
-    // Assists (3 points each)
-    points += playerStats.assists * 3;
-    
-    // Clean sheets (varies by position)
-    if (position === 1 || position === 2) { // GK or Defender
-      points += playerStats.clean_sheets * 4;
-    } else if (position === 3) { // Midfielder
-      points += playerStats.clean_sheets * 1;
-    }
-    
-    // Goals conceded (GK and Defenders lose 1 point per 2 goals)
-    if (position === 1 || position === 2) {
-      points -= Math.floor(playerStats.goals_conceded / 2);
-    }
-    
-    // Cards
-    points -= playerStats.yellow_cards * 1;
-    points -= playerStats.red_cards * 3;
-    
-    // Own goals
-    points -= playerStats.own_goals * 2;
-    
-    // Penalties missed
-    points -= playerStats.penalties_missed * 2;
-    
-    // Penalties saved (GK only)
-    if (position === 1) {
-      points += playerStats.penalties_saved * 5;
-    }
-    
-    // Saves (GK only, 1 point per 3 saves)
-    if (position === 1) {
-      points += Math.floor(playerStats.saves / 3);
-    }
-    
-    // Bonus points
-    points += playerStats.bonus;
-    
-    return Math.max(0, points); // Ensure points don't go negative
-  }
-
-  getPositionName(elementType: number): string {
-    switch (elementType) {
-      case 1: return "GKP";
-      case 2: return "DEF";
-      case 3: return "MID";
-      case 4: return "FWD";
-      default: return "UNK";
-    }
-  }
-
-  formatPrice(price: number): string {
-    return (price / 10).toFixed(1);
+  // Get cache statistics
+  getCacheStats() {
+    this.resetDailyCallCount();
+    return {
+      cacheSize: this.cache.size,
+      apiCallsToday: this.callCount,
+      remainingCalls: 24 - this.callCount,
+      lastResetDate: this.lastResetDate
+    };
   }
 }
 
-export const fplApiService = new FPLAPIService();
+export const fplAPI = new FPLAPIService();

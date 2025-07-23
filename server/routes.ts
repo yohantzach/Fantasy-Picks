@@ -2,26 +2,41 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { fplApiService } from "./fpl-api";
+import { fplAPI } from "./fpl-api";
 import { insertTeamSchema, insertPlayerSelectionSchema } from "@shared/schema";
 import { z } from "zod";
+
+// Helper functions
+function getPositionName(elementType: number): string {
+  switch (elementType) {
+    case 1: return "GKP";
+    case 2: return "DEF";
+    case 3: return "MID";
+    case 4: return "FWD";
+    default: return "UNK";
+  }
+}
+
+function formatPrice(price: number): string {
+  return (price / 10).toFixed(1);
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  // FPL Data endpoints
+  // FPL Data endpoints with hourly caching
   app.get("/api/fpl/players", async (req, res) => {
     try {
-      const players = await fplApiService.getPlayers();
-      const teams = await fplApiService.getTeams();
+      const players = await fplAPI.getPlayers();
+      const teams = await fplAPI.getTeams();
       
       // Add team information to players
       const playersWithTeams = players.map(player => ({
         ...player,
         team_name: teams.find(t => t.id === player.team)?.name || "Unknown",
         team_short_name: teams.find(t => t.id === player.team)?.short_name || "UNK",
-        position_name: fplApiService.getPositionName(player.element_type),
-        price_formatted: fplApiService.formatPrice(player.now_cost),
+        position_name: getPositionName(player.element_type),
+        price_formatted: formatPrice(player.now_cost),
       }));
       
       res.json(playersWithTeams);
@@ -33,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/fpl/teams", async (req, res) => {
     try {
-      const teams = await fplApiService.getTeams();
+      const teams = await fplAPI.getTeams();
       res.json(teams);
     } catch (error) {
       console.error("Error fetching teams:", error);
@@ -41,25 +56,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/fpl/fixtures", async (req, res) => {
+  // Updated fixtures endpoint with gameweek parameter
+  app.get("/api/fpl/fixtures/:gameweek?", async (req, res) => {
     try {
-      const gameweek = req.query.gameweek ? parseInt(req.query.gameweek as string) : undefined;
-      const fixtures = await fplApiService.getFixtures(gameweek);
-      const teams = await fplApiService.getTeams();
-      
-      // Add team information to fixtures
-      const fixturesWithTeams = fixtures.map(fixture => ({
-        ...fixture,
-        team_h_name: teams.find(t => t.id === fixture.team_h)?.name || "Unknown",
-        team_a_name: teams.find(t => t.id === fixture.team_a)?.name || "Unknown",
-        team_h_short: teams.find(t => t.id === fixture.team_h)?.short_name || "UNK",
-        team_a_short: teams.find(t => t.id === fixture.team_a)?.short_name || "UNK",
-      }));
-      
-      res.json(fixturesWithTeams);
+      const gameweek = req.params.gameweek ? parseInt(req.params.gameweek) : undefined;
+      const fixtures = await fplAPI.getFixturesWithTeamNames(gameweek);
+      res.json(fixtures);
     } catch (error) {
       console.error("Error fetching fixtures:", error);
       res.status(500).json({ error: "Failed to fetch fixtures" });
+    }
+  });
+
+  // Cache statistics endpoint for monitoring
+  app.get("/api/fpl/cache-stats", async (req, res) => {
+    try {
+      const stats = fplAPI.getCacheStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching cache stats:", error);
+      res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+
+  // Admin endpoint to update gameweek deadlines
+  app.post("/api/admin/update-deadlines", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user?.isAdmin) {
+      return res.sendStatus(403);
+    }
+
+    try {
+      const currentGameweek = await storage.getCurrentGameweek();
+      if (!currentGameweek) {
+        return res.status(404).json({ error: "No active gameweek found" });
+      }
+
+      // Update deadline based on current gameweek fixtures
+      const deadline = await fplAPI.getGameweekDeadline(currentGameweek.gameweekNumber);
+      await storage.updateGameweekDeadline(currentGameweek.id, new Date(deadline));
+
+      res.json({ 
+        message: "Deadline updated successfully",
+        newDeadline: deadline,
+        gameweek: currentGameweek.gameweekNumber
+      });
+    } catch (error) {
+      console.error("Error updating deadlines:", error);
+      res.status(500).json({ error: "Failed to update deadlines" });
     }
   });
 
@@ -70,12 +113,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!currentGameweek) {
         // Create first gameweek if none exists
-        const fplGameweek = await fplApiService.getCurrentGameweek();
-        const deadline = await fplApiService.getGameweekDeadline(fplGameweek);
+        const fplGameweek = await fplAPI.getCurrentGameweek();
+        const deadline = await fplAPI.getGameweekDeadline(fplGameweek.id);
         
-        if (deadline) {
-          currentGameweek = await storage.createGameweek(fplGameweek, deadline);
-        }
+        currentGameweek = await storage.createGameweek(fplGameweek.id, new Date(deadline));
       }
       
       res.json(currentGameweek);

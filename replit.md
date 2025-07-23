@@ -54,10 +54,12 @@ The application uses PostgreSQL with the following main entities:
 ## External Dependencies
 
 ### FPL API Integration
-- Bootstrap static data for players, teams, and game settings
-- Live fixtures and results data
-- Player statistics and performance metrics
-- Caching layer with 5-minute refresh intervals
+- **Hourly Caching System**: Maximum 24 API calls per day (one per hour)
+- **Bootstrap Static Data**: Players, teams, and game settings
+- **Live Fixtures Data**: Current gameweek fixtures with team names
+- **Player Statistics**: Performance metrics and points
+- **Automatic Deadline Management**: Gameweek deadlines set 2 hours before first match
+- **Cache Statistics**: Monitoring endpoint for API usage tracking
 
 ### Key Libraries
 - **Authentication**: Passport.js with connect-pg-simple for session storage
@@ -88,5 +90,21 @@ The application uses PostgreSQL with the following main entities:
 - Drizzle migrations stored in `/migrations` directory
 - Push-based schema updates for development
 - PostgreSQL-specific features and constraints utilized
+
+## Recent Changes
+
+### July 23, 2025
+- **Implemented Hourly API Caching**: FPL API calls now limited to 24 per day (1 per hour) with intelligent caching
+- **Fixed Formation Display**: Now shows exactly 11 players in 4-4-2 formation (1 GK, 4 DEF, 4 MID, 2 FWD)
+- **Added Navigation System**: Consistent navigation bar across all pages (Team Selection, Fixtures, Leaderboard)
+- **Enhanced Fixtures Page**: Shows only current gameweek fixtures with team names and difficulty ratings
+- **Automatic Deadline Management**: Gameweek deadlines automatically set 2 hours before first match
+- **Added Admin Controls**: Admin endpoint for manual deadline updates
+- **Improved Data Integrity**: All player and fixture data now comes from authentic FPL API
+
+### System Architecture Updates
+- **FPL API Service**: New caching service with hourly refresh and daily call limits
+- **Gameweek Management**: Automatic deadline calculation and update system
+- **Enhanced Routes**: Better error handling and cache statistics monitoring
 
 The application is designed to be deployed as a single process with the Express server handling both API routes and static file serving in production, while maintaining separate development servers for optimal developer experience.

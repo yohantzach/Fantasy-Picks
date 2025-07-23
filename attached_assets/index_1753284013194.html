@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premier League Fixtures</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #111827; color: #d1d5db; font-family: 'Inter', sans-serif; }
+     .fixture-card { background-color: #1f2937; border: 1px solid #374151; transition: transform 0.2s, box-shadow 0.2s; }
+     .fixture-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+     .team-logo { width: 32px; height: 32px; object-fit: contain; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-white">Premier League Fixtures</h1>
+            <p id="status-text" class="text-gray-400 mt-2">Fetching the latest fixtures...</p>
+        </header>
+
+        <main id="fixtures-container">
+            </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const fixturesContainer = document.getElementById('fixtures-container');
+            const statusText = document.getElementById('status-text');
+
+            try {
+                // Call our own backend proxy, not the external API directly.
+                const response = await fetch('http://localhost:3000/api/fixtures');
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    let errorMessage = `HTTP error! Status: ${response.status}`;
+                    if (error.message) {
+                        errorMessage = error.message;
+                    } else if (typeof error.errors === 'object' && error.errors.token) {
+                        errorMessage = `API Key Error: ${error.errors.token}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+
+                if (data.results === 0) {
+                    statusText.textContent = 'No fixtures found for the current season.';
+                    return;
+                }
+                
+                statusText.textContent = `Displaying ${data.results} fixtures for the 2024/2025 season. Data is refreshed hourly.`;
+                fixturesContainer.innerHTML = ''; // Clear the loading message
+
+                // Group fixtures by gameweek/round
+                const fixturesByRound = {};
+                data.response.forEach(fixture => {
+                    const round = fixture.league.round;
+                    if (!fixturesByRound[round]) {
+                        // Correctly initialize an empty array for a new round
+                        fixturesByRound[round] =[];
+                    }
+                    fixturesByRound[round].push(fixture);
+                });
+
+                // Display fixtures grouped by round
+                Object.keys(fixturesByRound).sort().forEach(round => {
+                    const roundContainer = document.createElement('div');
+                    roundContainer.className = 'mb-12';
+                    
+                    const roundHeader = document.createElement('h2');
+                    roundHeader.className = 'text-2xl font-semibold text-white col-span-full mb-4 border-b border-gray-700 pb-2';
+                    roundHeader.textContent = round;
+                    roundContainer.appendChild(roundHeader);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+
+                    fixturesByRound[round].forEach(fixture => {
+                        const homeTeam = fixture.teams.home;
+                        const awayTeam = fixture.teams.away;
+                        const fixtureDate = new Date(fixture.fixture.date).toLocaleString('en-IN', {
+                            dateStyle: 'full',
+                            timeStyle: 'short',
+                            timeZone: 'Asia/Kolkata'
+                        });
+
+                        const card = `
+                            <div class="fixture-card rounded-lg p-4 flex flex-col justify-between">
+                                <div class="text-center text-sm text-gray-400 mb-3">${fixtureDate} (IST)</div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3 w-2/5">
+                                        <img src="${homeTeam.logo}" alt="${homeTeam.name}" class="team-logo">
+                                        <span class="font-bold text-white text-sm">${homeTeam.name}</span>
+                                    </div>
+                                    <div class="text-xl font-mono text-gray-400">vs</div>
+                                    <div class="flex items-center justify-end text-right gap-3 w-2/5">
+                                        <span class="font-bold text-white text-sm">${awayTeam.name}</span>
+                                        <img src="${awayTeam.logo}" alt="${awayTeam.name}" class="team-logo">
+                                    </div>
+                                </div>
+                                <div class="text-center text-xs text-gray-500 mt-3">${fixture.fixture.venue.name}, ${fixture.fixture.venue.city}</div>
+                            </div>
+                        `;
+                        grid.innerHTML += card;
+                    });
+                    roundContainer.appendChild(grid);
+                    fixturesContainer.appendChild(roundContainer);
+                });
+
+            } catch (error) {
+                console.error('Failed to fetch fixtures:', error);
+                statusText.textContent = `Error: ${error.message}. Please ensure the backend server is running and the API key in the.env file is correct.`;
+                statusText.classList.add('text-red-400', 'font-semibold');
+            }
+        });
+    </script>
+</body>
+</html>
