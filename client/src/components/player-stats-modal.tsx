@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { FPLPlayer } from "@shared/schema";
 
@@ -54,6 +54,9 @@ export function PlayerStatsModal({ player, isOpen, onClose }: PlayerStatsModalPr
               </div>
             </div>
           </DialogTitle>
+          <DialogDescription>
+            View detailed player statistics and performance data
+          </DialogDescription>
         </DialogHeader>
         
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
