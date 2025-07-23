@@ -7,7 +7,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
-import TeamSelection from "@/pages/team-selection";
+import TeamSelection from "@/pages/team-selection-new";
 import Leaderboard from "@/pages/leaderboard";
 import Fixtures from "@/pages/fixtures";
 

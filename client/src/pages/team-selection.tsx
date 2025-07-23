@@ -3,28 +3,28 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { FPLPlayer, insertTeamSchema } from "@shared/schema";
-import { Clock, Save } from "lucide-react";
+import { Clock, Save, Users, DollarSign, Trophy, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
-import { PlayerStatsModal } from "@/components/player-stats-modal";
-import { FormationPitch } from "@/components/formation-pitch";
-import { PlayerSelectionTable } from "@/components/player-selection-table";
-import Navigation from "@/components/ui/navigation";
+import { PositionSelector } from "@/components/position-selector";
+import { PlayerDetailsModal } from "@/components/player-details-modal";
+import { EnhancedFormationPitch } from "@/components/enhanced-formation-pitch";
+import { Navigation } from "@/components/ui/navigation";
 
 
 
 export default function TeamSelection() {
   const { toast } = useToast();
-  const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<any[]>([]);
   const [teamName, setTeamName] = useState("");
   const [captainId, setCaptainId] = useState<number | null>(null);
   const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
-  const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<FPLPlayer | null>(null);
-  const [showPlayerTable, setShowPlayerTable] = useState<number | null>(null); // Position being selected
+  const [selectedPlayerForDetails, setSelectedPlayerForDetails] = useState<any>(null);
+  const [showPlayerDetails, setShowPlayerDetails] = useState(false);
+  const [positionSelectorOpen, setPositionSelectorOpen] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<string>("");
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
@@ -37,7 +37,7 @@ export default function TeamSelection() {
   });
 
   // Fetch FPL data
-  const { data: players = [] } = useQuery<FPLPlayer[]>({
+  const { data: players = [] } = useQuery({
     queryKey: ["/api/fpl/players"],
   });
 
