@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { PlayerStatsModal } from "@/components/player-stats-modal";
 import { FormationPitch } from "@/components/formation-pitch";
 import { PlayerSelectionTable } from "@/components/player-selection-table";
+import Navigation from "@/components/ui/navigation";
 
 
 
@@ -213,7 +214,9 @@ export default function TeamSelection() {
   const isLocked = currentTeam?.isLocked || isDeadlinePassed;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-green">
+      <Navigation />
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

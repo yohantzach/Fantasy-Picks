@@ -36,10 +36,10 @@ export function FormationPitch({
 
   const getPositionSlots = (elementType: number) => {
     switch (elementType) {
-      case 1: return 2; // 2 GK slots
-      case 2: return 5; // 5 DEF slots
-      case 3: return 5; // 5 MID slots
-      case 4: return 3; // 3 FWD slots
+      case 1: return 1; // 1 GK slot
+      case 2: return 4; // 4 DEF slots  
+      case 3: return 4; // 4 MID slots
+      case 4: return 2; // 2 FWD slots
       default: return 0;
     }
   };
