@@ -176,9 +176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate budget constraint
-      const players = await fplApiService.getPlayers();
-      const selectedPlayers = players.filter(p => teamData.players?.includes(p.id));
-      const totalCost = selectedPlayers.reduce((sum, p) => sum + p.now_cost, 0);
+      const players = await fplAPI.getPlayers();
+      const selectedPlayers = players.filter((p: any) => teamData.players?.includes(p.id));
+      const totalCost = selectedPlayers.reduce((sum: number, p: any) => sum + p.now_cost, 0);
       
       if (totalCost > 1000) { // 100.0m in API units
         return res.status(400).json({ error: "Team exceeds budget limit" });
@@ -186,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate max 3 players per team
       const teamCounts = new Map();
-      selectedPlayers.forEach(player => {
+      selectedPlayers.forEach((player: any) => {
         const count = teamCounts.get(player.team) || 0;
         teamCounts.set(player.team, count + 1);
       });
