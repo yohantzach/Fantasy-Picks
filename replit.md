@@ -93,6 +93,17 @@ The application uses PostgreSQL with the following main entities:
 
 ## Recent Changes
 
+### July 24, 2025
+- **Migration to Standard Replit Environment**: Successfully migrated from Replit Agent to standard Replit environment
+- **Payment System Implementation**: Added ₹20 payment requirement for normal users (admin bypass available)
+- **Formation Selection System**: Implemented 7 formation options (3-4-3, 3-5-2, 4-3-3, 4-4-2, 4-5-1, 5-4-1, 5-3-2)
+- **Captain/Vice-Captain Selection**: Added interactive captain and vice-captain selection functionality
+- **Football Pitch UI**: Created authentic football pitch visualization for team selection
+- **Enhanced Team Selection Page**: Complete redesign with formation-based player positioning
+- **Admin User Setup**: Fixed admin access with admin@gmail.com and Ezmoney123 password
+- **Database Schema Migration**: Successfully migrated all database tables and relationships
+- **Authentication Flow**: Enhanced protected routes with payment verification
+
 ### July 23, 2025
 - **Implemented Hourly API Caching**: FPL API calls now limited to 24 per day (1 per hour) with intelligent caching
 - **Fixed Formation Display**: Now shows exactly 11 players in 4-4-2 formation (1 GK, 4 DEF, 4 MID, 2 FWD)

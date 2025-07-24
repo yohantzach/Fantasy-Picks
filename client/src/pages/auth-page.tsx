@@ -259,9 +259,6 @@ export default function AuthPage() {
             <p className="text-sm text-white/70 mb-2">Entry Fee</p>
             <p className="text-4xl font-bold text-fpl-green">₹20</p>
             <p className="text-sm text-white/70">per gameweek</p>
-            <p className="text-xs text-white/60 mt-2">
-              * Admin can access without payment for testing
-            </p>
           </div>
         </div>
       </div>

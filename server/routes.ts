@@ -251,6 +251,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payment processing
+  app.post("/api/payment/confirm", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { paymentId, amount } = req.body;
+      
+      // In production, verify payment with payment gateway
+      // For now, we'll accept any paymentId as valid
+      if (!paymentId || amount !== 20) {
+        return res.status(400).json({ error: "Invalid payment details" });
+      }
+      
+      await storage.updateUserPayment(req.user!.id, paymentId);
+      res.json({ success: true, message: "Payment confirmed successfully" });
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      res.status(500).json({ error: "Failed to confirm payment" });
+    }
+  });
+
   app.post("/api/payment/verify", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     

@@ -7,7 +7,8 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
-import TeamSelection from "@/pages/team-selection-new";
+import PaymentPage from "@/pages/payment";
+import TeamSelection from "@/pages/team-selection-enhanced";
 import Leaderboard from "@/pages/leaderboard";
 import Fixtures from "@/pages/fixtures";
 
@@ -18,6 +19,7 @@ function Router() {
       <ProtectedRoute path="/leaderboard" component={Leaderboard} />
       <ProtectedRoute path="/fixtures" component={Fixtures} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/payment" component={PaymentPage} />
       <Route component={NotFound} />
     </Switch>
   );
