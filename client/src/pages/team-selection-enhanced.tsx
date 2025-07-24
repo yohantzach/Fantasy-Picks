@@ -9,7 +9,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Clock, Save, Users, DollarSign, Trophy, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { PositionSelector } from "@/components/position-selector";
-import { PlayerDetailsModal } from "@/components/player-details-modal";
+import { PlayerStatsModal } from "@/components/player-stats-modal";
 import { FormationSelector, FORMATIONS } from "@/components/formation-selector";
 import { FootballPitch } from "@/components/football-pitch";
 import Navigation from "@/components/ui/navigation";
@@ -33,8 +33,8 @@ export default function TeamSelectionEnhanced() {
   const [formation, setFormation] = useState("4-4-2");
   const [captainId, setCaptainId] = useState<number | null>(null);
   const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
-  const [selectedPlayerForDetails, setSelectedPlayerForDetails] = useState<Player | null>(null);
-  const [showPlayerDetails, setShowPlayerDetails] = useState(false);
+  const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<Player | null>(null);
+  const [showPlayerStats, setShowPlayerStats] = useState(false);
   const [positionSelectorOpen, setPositionSelectorOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<string>("");
 
@@ -59,7 +59,7 @@ export default function TeamSelectionEnhanced() {
 
   // Load current team data when available
   useEffect(() => {
-    if (currentTeam && players.length > 0) {
+    if (currentTeam && players && Array.isArray(players) && players.length > 0) {
       const teamData = currentTeam as any;
       const teamPlayers = (players as Player[]).filter((p: Player) => 
         teamData.players?.includes(p.id)
@@ -176,8 +176,26 @@ export default function TeamSelectionEnhanced() {
   };
 
   const handlePlayerInfo = (player: Player) => {
-    setSelectedPlayerForDetails(player);
-    setShowPlayerDetails(true);
+    setSelectedPlayerForStats(player);
+    setShowPlayerStats(true);
+  };
+
+  const handleReplacePlayer = (player: Player) => {
+    // Remove the current player and open position selector for replacement
+    handlePlayerRemove(player.id);
+    setSelectedPosition(player.position_name);
+    setPositionSelectorOpen(true);
+    setShowPlayerStats(false);
+  };
+
+  const handleMakeCaptainFromModal = (player: Player) => {
+    handleSetCaptain(player.id);
+    setShowPlayerStats(false);
+  };
+
+  const handleMakeViceCaptainFromModal = (player: Player) => {
+    handleSetViceCaptain(player.id);
+    setShowPlayerStats(false);
   };
 
   const handleSetCaptain = (playerId: number) => {
@@ -348,12 +366,7 @@ export default function TeamSelectionEnhanced() {
                     </div>
                     <div className="text-xs text-white/70">Players</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-white">
-                      {teamStats.totalPoints}
-                    </div>
-                    <div className="text-xs text-white/70">Total Points</div>
-                  </div>
+
                 </div>
 
                 {/* Position breakdown */}
@@ -430,14 +443,19 @@ export default function TeamSelectionEnhanced() {
         />
       )}
 
-      {/* Player Details Modal */}
-      {showPlayerDetails && selectedPlayerForDetails && (
-        <PlayerDetailsModal
-          player={selectedPlayerForDetails}
-          team={fplTeams.find((t: any) => t.id === selectedPlayerForDetails.team)}
-          isOpen={showPlayerDetails}
-          onClose={() => setShowPlayerDetails(false)}
-          position={selectedPlayerForDetails.position_name}
+      {/* Player Stats Modal */}
+      {showPlayerStats && selectedPlayerForStats && (
+        <PlayerStatsModal
+          player={selectedPlayerForStats}
+          isOpen={showPlayerStats}
+          onClose={() => setShowPlayerStats(false)}
+          onReplace={handleReplacePlayer}
+          onMakeCaptain={handleMakeCaptainFromModal}
+          onMakeViceCaptain={handleMakeViceCaptainFromModal}
+          showCaptainOption={captainId === null || captainId === selectedPlayerForStats.id}
+          showViceCaptainOption={viceCaptainId === null || viceCaptainId === selectedPlayerForStats.id}
+          isCaptain={captainId === selectedPlayerForStats.id}
+          isViceCaptain={viceCaptainId === selectedPlayerForStats.id}
         />
       )}
     </div>

@@ -13,6 +13,8 @@ interface Player {
   price_formatted: string;
   total_points: number;
   now_cost: number;
+  element_type: number;
+  team: number;
 }
 
 interface FootballPitchProps {
@@ -80,7 +82,7 @@ export function FootballPitch({
               ${isCaptain ? 'ring-2 ring-yellow-400' : ''}
               ${isViceCaptain ? 'ring-2 ring-gray-400' : ''}
             `}
-            onClick={() => setShowDropdown(showDropdown === player.id ? null : player.id)}
+            onClick={() => onPlayerInfo(player)}
           >
             <div className="text-center">
               <div className="flex items-center justify-center mb-1">
@@ -99,67 +101,7 @@ export function FootballPitch({
               </div>
             </div>
             
-            {/* Dropdown menu */}
-            {showDropdown === player.id && (
-              <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-gray-900 border border-gray-700 rounded-md shadow-lg">
-                <div className="p-2 space-y-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full text-left text-yellow-400 hover:bg-yellow-400/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSetCaptain(player.id);
-                      setShowDropdown(null);
-                    }}
-                    disabled={disabled}
-                  >
-                    <Crown className="h-3 w-3 mr-2" />
-                    Make Captain
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full text-left text-gray-400 hover:bg-gray-400/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSetViceCaptain(player.id);
-                      setShowDropdown(null);
-                    }}
-                    disabled={disabled}
-                  >
-                    <Shield className="h-3 w-3 mr-2" />
-                    Make Vice Captain
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full text-left text-blue-400 hover:bg-blue-400/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlayerInfo(player);
-                      setShowDropdown(null);
-                    }}
-                  >
-                    <Info className="h-3 w-3 mr-2" />
-                    Player Info
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full text-left text-red-400 hover:bg-red-400/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlayerRemove(player.id);
-                      setShowDropdown(null);
-                    }}
-                    disabled={disabled}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            )}
+
           </Card>
         </div>
       );
