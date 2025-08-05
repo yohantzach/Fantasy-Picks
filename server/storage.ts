@@ -75,20 +75,23 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    // Set admin flag for admin email
-    const userData = {
-      ...insertUser,
-      isAdmin: insertUser.email === "admin@gmail.com"
-    };
-    
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .returning();
-    return user;
-  }
+async createUser(insertUser: InsertUser): Promise<User> {
+  const userData = {
+    ...insertUser,
+    isAdmin: insertUser.email === "admin@gmail.com"
+  };
+  
+  console.log("Creating user:", userData);  // <--- add this
 
+  const [user] = await db
+    .insert(users)
+    .values(userData)
+    .returning();
+
+  console.log("User created:", user);  // <--- and this
+
+  return user;
+}
   async updateUserPayment(userId: number, paymentId: string): Promise<void> {
     await db
       .update(users)
