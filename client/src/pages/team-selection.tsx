@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Clock, Save, Users, DollarSign, Trophy, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
-import { PositionSelector } from "@/components/position-selector";
-import { PlayerDetailsModal } from "@/components/player-details-modal";
-import { EnhancedFormationPitch } from "@/components/enhanced-formation-pitch";
+import { FormationPitch } from "@/components/formation-pitch";
+import { PlayerSelectionTable } from "@/components/player-selection-table";
+import { PlayerStatsModal } from "@/components/player-stats-modal";
 import { Navigation } from "@/components/ui/navigation";
 
 
@@ -21,10 +22,8 @@ export default function TeamSelection() {
   const [teamName, setTeamName] = useState("");
   const [captainId, setCaptainId] = useState<number | null>(null);
   const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
-  const [selectedPlayerForDetails, setSelectedPlayerForDetails] = useState<any>(null);
-  const [showPlayerDetails, setShowPlayerDetails] = useState(false);
-  const [positionSelectorOpen, setPositionSelectorOpen] = useState(false);
-  const [selectedPosition, setSelectedPosition] = useState<string>("");
+  const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<any>(null);
+  const [showPlayerTable, setShowPlayerTable] = useState<number | null>(null);
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
@@ -197,13 +196,13 @@ export default function TeamSelection() {
       return;
     }
 
-    const teamData = insertTeamSchema.parse({
+    const teamData = {
       teamName: teamName.trim(),
       formation: "4-4-2",
       players: selectedPlayers,
       captainId,
       viceCaptainId,
-    });
+    };
 
     saveTeamMutation.mutate(teamData);
   };
@@ -414,6 +413,15 @@ export default function TeamSelection() {
           player={selectedPlayerForStats}
           isOpen={!!selectedPlayerForStats}
           onClose={() => setSelectedPlayerForStats(null)}
+          onReplace={() => console.log('Replace player')}
+          onMakeCaptain={() => console.log('Make captain')}
+          onMakeViceCaptain={() => console.log('Make vice captain')}
+          onRemoveCaptain={() => console.log('Remove captain')}
+          onRemoveViceCaptain={() => console.log('Remove vice captain')}
+          showCaptainOption={true}
+          showViceCaptainOption={true}
+          isCaptain={captainId === selectedPlayerForStats?.id}
+          isViceCaptain={viceCaptainId === selectedPlayerForStats?.id}
         />
       )}
       </div>

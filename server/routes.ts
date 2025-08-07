@@ -34,6 +34,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const players = await fplAPI.getPlayers();
       const teams = await fplAPI.getTeams();
       
+      // Get current gameweek fixtures
+      const currentGameweek = await fplAPI.getCurrentGameweek();
+      const fixtures = await fplAPI.getFixturesWithTeamNames(currentGameweek.id);
+      
       // Add team information and injury status to players
       const playersWithTeams = players.map(player => {
         // Determine injury status based on FPL data
@@ -62,6 +66,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           chanceOfPlaying = player.chance_of_playing_next_round;
         }
         
+        // Find next fixture for this player's team
+        let nextOpponent = 'TBD';
+        const teamFixtures = fixtures.filter(f => 
+          (f.team_h === player.team || f.team_a === player.team) && !f.finished
+        );
+        
+        if (teamFixtures.length > 0) {
+          // Get the earliest upcoming fixture
+          const nextFixture = teamFixtures.sort((a, b) => 
+            new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
+          )[0];
+          
+          if (nextFixture) {
+            const isHome = nextFixture.team_h === player.team;
+            const opponentTeam = teams.find(t => 
+              t.id === (isHome ? nextFixture.team_a : nextFixture.team_h)
+            );
+            if (opponentTeam) {
+              nextOpponent = `${opponentTeam.short_name}(${isHome ? 'H' : 'A'})`;
+            }
+          }
+        }
+        
         return {
           ...player,
           team_name: teams.find(t => t.id === player.team)?.name || "Unknown",
@@ -72,7 +99,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           injury_info: injuryInfo,
           chance_of_playing: chanceOfPlaying,
           news_summary: player.news || '',
-          is_available: injuryStatus === 'available'
+          is_available: injuryStatus === 'available',
+          next_opponent: nextOpponent
         };
       });
       

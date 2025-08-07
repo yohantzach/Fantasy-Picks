@@ -106,12 +106,8 @@ export function FormationPitch({
 
   return (
     <div className="relative w-full max-w-2xl mx-auto">
-      {/* Football Pitch Background */}
-      <div className="bg-gradient-to-b from-green-400 to-green-500 rounded-lg p-8 min-h-[500px] relative overflow-hidden">
-        {/* Pitch lines */}
-        <div className="absolute inset-4 border-2 border-white/30 rounded"></div>
-        <div className="absolute left-1/2 top-4 bottom-4 w-0.5 bg-white/30 transform -translate-x-0.5"></div>
-        <div className="absolute left-1/2 top-1/2 w-16 h-16 border-2 border-white/30 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+      {/* Simple Green Pitch Background */}
+      <div className="bg-gradient-to-b from-green-500 to-green-600 rounded-lg p-8 min-h-[500px] relative">
         
         {/* Formation Layout */}
         <div className="relative z-10 pt-4">

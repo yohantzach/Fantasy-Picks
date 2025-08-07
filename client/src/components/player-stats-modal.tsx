@@ -100,7 +100,7 @@ export function PlayerStatsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 border-purple-500/30 text-white">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 border-purple-500/30 text-white">
         <DialogHeader className="relative">
           <Button
             variant="ghost"
@@ -198,10 +198,11 @@ export function PlayerStatsModal({
           <Separator className="bg-white/20" />
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Button
               onClick={() => onReplace(player)}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              size="sm"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Replace Player
@@ -210,7 +211,8 @@ export function PlayerStatsModal({
             {showCaptainOption && (
               <Button
                 onClick={() => onMakeCaptain(player)}
-                className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
+                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+                size="sm"
               >
                 <Crown className="h-4 w-4 mr-2" />
                 Make Captain
@@ -220,7 +222,8 @@ export function PlayerStatsModal({
             {showViceCaptainOption && (
               <Button
                 onClick={() => onMakeViceCaptain(player)}
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
+                className="w-full bg-gray-600 hover:bg-gray-700 text-white"
+                size="sm"
               >
                 <Shield className="h-4 w-4 mr-2" />
                 Make Vice Captain
@@ -230,7 +233,8 @@ export function PlayerStatsModal({
             {isCaptain && (
               <Button
                 onClick={() => onRemoveCaptain(player)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+                size="sm"
               >
                 <X className="h-4 w-4 mr-2" />
                 Remove Captain
@@ -240,7 +244,8 @@ export function PlayerStatsModal({
             {isViceCaptain && (
               <Button
                 onClick={() => onRemoveViceCaptain(player)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+                size="sm"
               >
                 <X className="h-4 w-4 mr-2" />
                 Remove Vice Captain

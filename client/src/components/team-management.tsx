@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Edit, Trash2, Plus, Eye, Users, Crown, Shield } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Edit, Trash2, Plus, Eye, Users, Crown, Shield, Lock, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 interface Team {
@@ -79,6 +80,7 @@ export function TeamManagement({ onEditTeam, onCreateTeam }: TeamManagementProps
   };
 
   const isDeadlinePassed = currentGameweek && (currentGameweek as any).deadline && new Date() > new Date((currentGameweek as any).deadline);
+  const gameweekInProgress = isDeadlinePassed && !(currentGameweek as any).isCompleted;
 
   if (isLoading) {
     return (
@@ -107,6 +109,21 @@ export function TeamManagement({ onEditTeam, onCreateTeam }: TeamManagementProps
           Create New Team
         </Button>
       </div>
+
+      {/* Gameweek Status Message */}
+      {gameweekInProgress && (
+        <Card className="bg-orange-500/20 border-orange-500/30">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-orange-300">
+              <Clock className="h-5 w-5" />
+              <span className="font-medium">Gameweek In Progress</span>
+            </div>
+            <p className="text-orange-200 text-sm mt-1">
+              Teams are locked while matches are being played. Points will update live during matches.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Teams Grid */}
       {teams.length === 0 ? (

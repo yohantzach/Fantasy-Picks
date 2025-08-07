@@ -149,38 +149,21 @@ export function FootballPitch({
 
   return (
     <div 
-      className="relative min-h-[600px] p-6 rounded-lg shadow-2xl"
-      style={{
-        background: `
-          radial-gradient(ellipse at center, #228B22 0%, #32CD32 30%, #228B22 60%, #006400 100%),
-          repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 49px,
-            rgba(255,255,255,0.15) 49px,
-            rgba(255,255,255,0.15) 50px
-          )
-        `,
-        backgroundSize: '100% 100%, 100% 50px',
-        boxShadow: 'inset 0 0 50px rgba(0,0,0,0.3)'
-      }}
+      className="relative min-h-[600px] p-6 rounded-lg shadow-2xl bg-gradient-to-b from-green-400 to-green-600"
       onClick={() => setShowDropdown(null)}
     >
-      {/* Goal */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-2 bg-white/40 rounded-b-lg"></div>
-      
-      {/* Penalty Area */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -ml-16 w-32 h-12 border-2 border-white/40 border-t-0"></div>
-      
-      {/* Goal Area */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -ml-8 w-16 h-6 border-2 border-white/40 border-t-0"></div>
-      
-      {/* Center Circle */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 border-2 border-white/40 rounded-full"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white/40 rounded-full"></div>
-      
-      {/* Half Line */}
-      <div className="absolute top-1/2 left-0 right-0 h-px bg-white/40"></div>
+      {/* Simple green pitch background with subtle grass pattern */}
+      <div className="absolute inset-0 rounded-lg opacity-20">
+        <div className="w-full h-full" style={{
+          backgroundImage: `repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 30px,
+            rgba(255,255,255,0.1) 30px,
+            rgba(255,255,255,0.1) 32px
+          )`
+        }}></div>
+      </div>
       
       {/* Players positioned according to formation */}
       <div className="relative z-10 h-full flex flex-col justify-between py-8">
@@ -199,20 +182,20 @@ export function FootballPitch({
       
       {/* Formation Badge */}
       <div className="absolute top-4 right-4">
-        <Badge className="bg-fpl-green text-white">
+        <Badge className="bg-white/20 text-white border-white/30">
           {formation}
         </Badge>
       </div>
       
       {/* Legend */}
       <div className="absolute bottom-4 left-4 flex gap-4 text-xs">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded">
           <Crown className="h-3 w-3 text-yellow-400" />
-          <span className="text-white/80">Captain</span>
+          <span className="text-white/90">Captain</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded">
           <Shield className="h-3 w-3 text-gray-400" />
-          <span className="text-white/80">Vice Captain</span>
+          <span className="text-white/90">Vice Captain</span>
         </div>
       </div>
     </div>

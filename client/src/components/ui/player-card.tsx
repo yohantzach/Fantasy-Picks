@@ -19,6 +19,7 @@ type FPLPlayer = {
   team_short_name: string;
   position_name: string;
   price_formatted: string;
+  next_opponent?: string;
 };
 
 type PlayerCardProps = {
@@ -70,6 +71,12 @@ export default function PlayerCard({ player, isSelected, onToggle }: PlayerCardP
             <div className="flex-1">
               <div className="text-white font-medium text-sm leading-tight">
                 {player.web_name}
+              </div>
+              <div className="text-blue-300 text-xs truncate mb-1">
+                {player.team_name}
+              </div>
+              <div className="text-orange-300 text-xs truncate mb-1">
+                Next: vs {player.next_opponent || 'TBD'}
               </div>
               <div className="flex items-center gap-1 mt-1">
                 <Badge 

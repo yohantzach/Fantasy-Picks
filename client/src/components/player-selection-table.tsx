@@ -83,19 +83,23 @@ export function PlayerSelectionTable({
     let result = 0;
     switch (sortBy) {
       case "price":
-        result = a.now_cost - b.now_cost;
+        result = (a.now_cost || 0) - (b.now_cost || 0);
         break;
       case "points":
-        result = a.total_points - b.total_points;
+        result = (a.total_points || 0) - (b.total_points || 0);
         break;
       case "form":
-        result = parseFloat(a.form) - parseFloat(b.form);
+        const formA = parseFloat(a.form || '0');
+        const formB = parseFloat(b.form || '0');
+        result = formA - formB;
         break;
       case "selected":
-        result = parseFloat(a.selected_by_percent) - parseFloat(b.selected_by_percent);
+        const selectedA = parseFloat(a.selected_by_percent || '0');
+        const selectedB = parseFloat(b.selected_by_percent || '0');
+        result = selectedA - selectedB;
         break;
       default:
-        result = a.now_cost - b.now_cost;
+        result = (a.now_cost || 0) - (b.now_cost || 0);
     }
     return sortOrder === "asc" ? result : -result;
   });
@@ -122,25 +126,56 @@ export function PlayerSelectionTable({
             />
           </div>
           
-          <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="price">Price (High to Low)</SelectItem>
-              <SelectItem value="points">Points (High to Low)</SelectItem>
-              <SelectItem value="form">Form (High to Low)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Button
+              variant={sortBy === "price" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("price")}
+              className={`text-black border-2 ${sortBy === "price" ? "bg-fpl-green text-white border-fpl-green hover:bg-fpl-green/80" : "bg-white border-gray-400 hover:bg-gray-100"}`}
+            >
+              Price
+              <SortIcon column="price" />
+            </Button>
+            
+            <Button
+              variant={sortBy === "points" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("points")}
+              className={`text-black border-2 ${sortBy === "points" ? "bg-fpl-green text-white border-fpl-green hover:bg-fpl-green/80" : "bg-white border-gray-400 hover:bg-gray-100"}`}
+            >
+              Points
+              <SortIcon column="points" />
+            </Button>
+            
+            <Button
+              variant={sortBy === "form" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("form")}
+              className={`text-black border-2 ${sortBy === "form" ? "bg-fpl-green text-white border-fpl-green hover:bg-fpl-green/80" : "bg-white border-gray-400 hover:bg-gray-100"}`}
+            >
+              Form
+              <SortIcon column="form" />
+            </Button>
+            
+            <Button
+              variant={sortBy === "selected" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("selected")}
+              className={`text-black border-2 ${sortBy === "selected" ? "bg-fpl-green text-white border-fpl-green hover:bg-fpl-green/80" : "bg-white border-gray-400 hover:bg-gray-100"}`}
+            >
+              Selected %
+              <SortIcon column="selected" />
+            </Button>
+          </div>
           
           <Select value={filterTeam} onValueChange={setFilterTeam}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 text-black bg-white">
               <SelectValue placeholder="Filter team" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Teams</SelectItem>
+            <SelectContent className="bg-white">
+              <SelectItem value="all" className="text-black hover:bg-gray-100">All Teams</SelectItem>
               {fplTeams.map((team: any) => (
-                <SelectItem key={team.id} value={team.id.toString()}>
+                <SelectItem key={team.id} value={team.id.toString()} className="text-black hover:bg-gray-100">
                   {team.short_name}
                 </SelectItem>
               ))}
@@ -157,10 +192,10 @@ export function PlayerSelectionTable({
                 <TableHead>Player</TableHead>
                 <TableHead>Team</TableHead>
                 <TableHead 
-                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  className="cursor-pointer hover:bg-muted/50 select-none text-center"
                   onClick={() => handleSort("price")}
                 >
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 justify-center">
                     Price
                     <SortIcon column="price" />
                   </div>
@@ -213,7 +248,7 @@ export function PlayerSelectionTable({
                     <TableCell>
                       <Badge variant="outline">{getTeamName(player.team)}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <span className="font-medium">£{(player.now_cost / 10).toFixed(1)}m</span>
                     </TableCell>
                     <TableCell>
