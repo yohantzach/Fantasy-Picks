@@ -18,8 +18,10 @@ export default function Navigation() {
 
   const navItems = [
     { path: "/", label: "Team Selection", icon: "⚽" },
+    { path: "/teams", label: "My Teams", icon: "👥" },
     { path: "/leaderboard", label: "Leaderboard", icon: "🏆" },
     { path: "/fixtures", label: "Fixtures", icon: "📅" },
+    ...(user?.isAdmin ? [{ path: "/admin", label: "Admin", icon: "⚙️" }] : []),
   ];
 
   const isActive = (path: string) => {

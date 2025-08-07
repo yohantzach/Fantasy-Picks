@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { TooltipHover } from "@/components/ui/tooltip-hover";
 import { 
   Star, 
   TrendingUp, 
@@ -46,6 +47,8 @@ interface PlayerStatsModalProps {
   onReplace: (player: Player) => void;
   onMakeCaptain: (player: Player) => void;
   onMakeViceCaptain: (player: Player) => void;
+  onRemoveCaptain: (player: Player) => void;
+  onRemoveViceCaptain: (player: Player) => void;
   showCaptainOption: boolean;
   showViceCaptainOption: boolean;
   isCaptain: boolean;
@@ -59,6 +62,8 @@ export function PlayerStatsModal({
   onReplace,
   onMakeCaptain,
   onMakeViceCaptain,
+  onRemoveCaptain,
+  onRemoveViceCaptain,
   showCaptainOption,
   showViceCaptainOption,
   isCaptain,
@@ -135,27 +140,39 @@ export function PlayerStatsModal({
           </div>
 
           {/* Key Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-3">
             <Card className="bg-white/10 border-white/20">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white">{player.total_points}</div>
-                <div className="text-sm text-gray-300">Total Points</div>
+              <CardContent className="p-3 text-center">
+                <div className="text-xl font-bold text-white">{player.total_points}</div>
+                <div className="text-xs text-gray-300">Total Points</div>
               </CardContent>
             </Card>
             <Card className="bg-white/10 border-white/20">
-              <CardContent className="p-4 text-center">
-                <div className={`text-2xl font-bold ${getFormColor(player.form || "0")}`}>
+              <CardContent className="p-3 text-center">
+                <div className={`text-xl font-bold ${getFormColor(player.form || "0")}`}>
                   {player.form || "0.0"}
                 </div>
-                <div className="text-sm text-gray-300">Form</div>
+                <div className="text-xs text-gray-300">Form</div>
               </CardContent>
             </Card>
             <Card className="bg-white/10 border-white/20">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white">
+              <CardContent className="p-3 text-center">
+                <TooltipHover content="Points Per Game">
+                  <div className="cursor-help">
+                    <div className="text-xl font-bold text-white">
+                      {player.points_per_game || "0.0"}
+                    </div>
+                    <div className="text-xs text-gray-300">PPG</div>
+                  </div>
+                </TooltipHover>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/10 border-white/20">
+              <CardContent className="p-3 text-center">
+                <div className="text-xl font-bold text-white">
                   {player.selected_by_percent || "0"}%
                 </div>
-                <div className="text-sm text-gray-300">Selected By</div>
+                <div className="text-xs text-gray-300">Selected By</div>
               </CardContent>
             </Card>
           </div>
@@ -207,6 +224,26 @@ export function PlayerStatsModal({
               >
                 <Shield className="h-4 w-4 mr-2" />
                 Make Vice Captain
+              </Button>
+            )}
+            
+            {isCaptain && (
+              <Button
+                onClick={() => onRemoveCaptain(player)}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Remove Captain
+              </Button>
+            )}
+            
+            {isViceCaptain && (
+              <Button
+                onClick={() => onRemoveViceCaptain(player)}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Remove Vice Captain
               </Button>
             )}
           </div>

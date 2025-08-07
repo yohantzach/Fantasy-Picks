@@ -238,7 +238,10 @@ export function PositionSelector({
                                 <div className="text-fpl-green font-bold text-lg">
                                   £{(player.now_cost / 10).toFixed(1)}m
                                 </div>
-                                <div className="text-slate-400 text-xs">
+                                <div 
+                                  className="text-slate-400 text-xs cursor-help" 
+                                  title="Points Per Game"
+                                >
                                   PPG: {player.points_per_game}
                                 </div>
                               </div>

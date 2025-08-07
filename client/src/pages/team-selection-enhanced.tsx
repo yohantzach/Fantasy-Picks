@@ -108,7 +108,8 @@ export default function TeamSelectionEnhanced() {
       isValid: selectedPlayers.length === 11 && 
                isValidFormation &&
                totalCost <= 100 &&
-               captainId !== null
+               captainId !== null &&
+               viceCaptainId !== null
     };
   }, [selectedPlayers, formation, captainId]);
 
@@ -195,6 +196,16 @@ export default function TeamSelectionEnhanced() {
 
   const handleMakeViceCaptainFromModal = (player: Player) => {
     handleSetViceCaptain(player.id);
+    setShowPlayerStats(false);
+  };
+
+  const handleRemoveCaptainFromModal = (player: Player) => {
+    setCaptainId(null);
+    setShowPlayerStats(false);
+  };
+
+  const handleRemoveViceCaptainFromModal = (player: Player) => {
+    setViceCaptainId(null);
     setShowPlayerStats(false);
   };
 
@@ -425,6 +436,7 @@ export default function TeamSelectionEnhanced() {
                 {teamStats.totalPlayers !== 11 && "Select 11 players. "}
                 {teamStats.remainingBudget < 0 && "Reduce team cost. "}
                 {!captainId && "Choose a captain. "}
+                {!viceCaptainId && "Choose a vice captain. "}
               </div>
             )}
           </div>
@@ -452,6 +464,8 @@ export default function TeamSelectionEnhanced() {
           onReplace={handleReplacePlayer}
           onMakeCaptain={handleMakeCaptainFromModal}
           onMakeViceCaptain={handleMakeViceCaptainFromModal}
+          onRemoveCaptain={handleRemoveCaptainFromModal}
+          onRemoveViceCaptain={handleRemoveViceCaptainFromModal}
           showCaptainOption={captainId === null || captainId === selectedPlayerForStats.id}
           showViceCaptainOption={viceCaptainId === null || viceCaptainId === selectedPlayerForStats.id}
           isCaptain={captainId === selectedPlayerForStats.id}

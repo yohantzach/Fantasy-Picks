@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { fplAPI } from "./fpl-api";
 import { insertTeamSchema, insertPlayerSelectionSchema } from "@shared/schema";
 import { z } from "zod";
+import teamsRouter from "./routes/teams";
 
 // Helper functions
 function getPositionName(elementType: number): string {
@@ -23,6 +24,9 @@ function formatPrice(price: number): string {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+  
+  // Register team management routes
+  app.use("/api/teams", teamsRouter);
 
   // FPL Data endpoints with hourly caching
   app.get("/api/fpl/players", async (req, res) => {
@@ -30,14 +34,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const players = await fplAPI.getPlayers();
       const teams = await fplAPI.getTeams();
       
-      // Add team information to players
-      const playersWithTeams = players.map(player => ({
-        ...player,
-        team_name: teams.find(t => t.id === player.team)?.name || "Unknown",
-        team_short_name: teams.find(t => t.id === player.team)?.short_name || "UNK",
-        position_name: getPositionName(player.element_type),
-        price_formatted: formatPrice(player.now_cost),
-      }));
+      // Add team information and injury status to players
+      const playersWithTeams = players.map(player => {
+        // Determine injury status based on FPL data
+        let injuryStatus = 'available';
+        let injuryInfo = '';
+        
+        if (player.status === 'i') {
+          injuryStatus = 'injured';
+          injuryInfo = 'Injured';
+        } else if (player.status === 'd') {
+          injuryStatus = 'doubtful';
+          injuryInfo = 'Doubtful';
+        } else if (player.status === 's') {
+          injuryStatus = 'suspended';
+          injuryInfo = 'Suspended';
+        } else if (player.status === 'u') {
+          injuryStatus = 'unavailable';
+          injuryInfo = 'Unavailable';
+        }
+        
+        // Add chance of playing info
+        let chanceOfPlaying = null;
+        if (player.chance_of_playing_this_round !== null) {
+          chanceOfPlaying = player.chance_of_playing_this_round;
+        } else if (player.chance_of_playing_next_round !== null) {
+          chanceOfPlaying = player.chance_of_playing_next_round;
+        }
+        
+        return {
+          ...player,
+          team_name: teams.find(t => t.id === player.team)?.name || "Unknown",
+          team_short_name: teams.find(t => t.id === player.team)?.short_name || "UNK",
+          position_name: getPositionName(player.element_type),
+          price_formatted: formatPrice(player.now_cost),
+          injury_status: injuryStatus,
+          injury_info: injuryInfo,
+          chance_of_playing: chanceOfPlaying,
+          news_summary: player.news || '',
+          is_available: injuryStatus === 'available'
+        };
+      });
       
       res.json(playersWithTeams);
     } catch (error) {
@@ -292,6 +329,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoints
+  app.get("/api/admin/teams", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user!.isAdmin) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const gameweekId = req.query.gameweek ? parseInt(req.query.gameweek as string) : null;
+      
+      let teams;
+      if (gameweekId) {
+        teams = await storage.getTeamsForGameweek(gameweekId);
+      } else {
+        teams = await storage.getAllTeams();
+      }
+      
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams for admin:", error);
+      res.status(500).json({ error: "Failed to fetch teams" });
+    }
+  });
+
+  app.get("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user!.isAdmin) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users for admin:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/teams/:id/lock", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user!.isAdmin) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const teamId = parseInt(req.params.id);
+      const { isLocked } = req.body;
+      
+      await storage.updateTeamLockStatus(teamId, isLocked);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating team lock status:", error);
+      res.status(500).json({ error: "Failed to update team lock status" });
+    }
+  });
+
   app.post("/api/admin/gameweek/:gameweekId/complete", async (req, res) => {
     if (!req.isAuthenticated() || !req.user!.isAdmin) {
       return res.sendStatus(403);

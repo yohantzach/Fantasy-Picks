@@ -11,6 +11,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { z } from "zod";
 import { Loader2, Volleyball, Trophy, DollarSign, Target, Zap } from "lucide-react";
+import { TermsAndConditions } from "@/components/terms-conditions";
+import { Help } from "@/components/help";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -37,6 +39,7 @@ export default function AuthPage() {
       email: "",
       password: "",
       name: "",
+      phone: "",
       age: 18,
       gender: "male",
     },
@@ -146,6 +149,20 @@ export default function AuthPage() {
                   )}
                 </div>
                 <div>
+                  <Label htmlFor="phone" className="text-white">Phone Number</Label>
+                  <Input
+                    {...registerForm.register("phone")}
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:ring-fpl-green focus:border-fpl-green"
+                  />
+                  {registerForm.formState.errors.phone && (
+                    <p className="text-red-400 text-sm mt-1">
+                      {registerForm.formState.errors.phone.message}
+                    </p>
+                  )}
+                </div>
+                <div>
                   <Label htmlFor="password" className="text-white">Password</Label>
                   <Input
                     {...registerForm.register("password")}
@@ -222,6 +239,13 @@ export default function AuthPage() {
                   {isLogin ? "Sign Up" : "Sign In"}
                 </Button>
               </p>
+            </div>
+            
+            {/* Terms and Help Links */}
+            <div className="flex justify-center items-center space-x-4 text-white/70 text-xs">
+              <TermsAndConditions />
+              <span>•</span>
+              <Help />
             </div>
           </CardContent>
         </Card>

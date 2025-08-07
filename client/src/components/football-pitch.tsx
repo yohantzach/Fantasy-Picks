@@ -8,6 +8,8 @@ import { FORMATIONS } from "./formation-selector";
 interface Player {
   id: number;
   web_name: string;
+  first_name?: string;
+  second_name?: string;
   team_name: string;
   position_name: string;
   price_formatted: string;
@@ -15,6 +17,9 @@ interface Player {
   now_cost: number;
   element_type: number;
   team: number;
+  next_opponent?: string;
+  injury_status?: string;
+  availability?: string;
 }
 
 interface FootballPitchProps {
@@ -92,12 +97,22 @@ export function FootballPitch({
                   {player.web_name}
                 </span>
               </div>
-              <div className="text-xs text-gray-300 truncate">{player.team_name}</div>
-              <div className="text-xs text-fpl-green font-semibold">
-                £{player.price_formatted}m
+              <div className="text-[10px] text-gray-300 truncate mb-1">
+                {player.first_name} {player.second_name}
               </div>
-              <div className="text-xs text-white/80">
-                {player.total_points} pts
+              <div className="text-xs text-blue-300 truncate font-medium">
+                {player.team_name}
+              </div>
+              <div className="text-[10px] text-orange-300 truncate mb-1">
+                Next: vs {player.next_opponent || 'TBD'}
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-fpl-green font-semibold">
+                  £{player.price_formatted}m
+                </span>
+                <span className="text-white/80">
+                  {player.total_points}pts
+                </span>
               </div>
             </div>
             
@@ -134,19 +149,20 @@ export function FootballPitch({
 
   return (
     <div 
-      className="relative min-h-[600px] p-6 rounded-lg"
+      className="relative min-h-[600px] p-6 rounded-lg shadow-2xl"
       style={{
         background: `
-          linear-gradient(90deg, #2d5c2d 0%, #3d7c3d 50%, #2d5c2d 100%),
+          radial-gradient(ellipse at center, #228B22 0%, #32CD32 30%, #228B22 60%, #006400 100%),
           repeating-linear-gradient(
             0deg,
             transparent,
             transparent 49px,
-            rgba(255,255,255,0.1) 49px,
-            rgba(255,255,255,0.1) 50px
+            rgba(255,255,255,0.15) 49px,
+            rgba(255,255,255,0.15) 50px
           )
         `,
-        backgroundSize: '100% 100%, 100% 50px'
+        backgroundSize: '100% 100%, 100% 50px',
+        boxShadow: 'inset 0 0 50px rgba(0,0,0,0.3)'
       }}
       onClick={() => setShowDropdown(null)}
     >

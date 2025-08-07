@@ -319,7 +319,39 @@ class FPLAPIService {
     return deadline.toISOString();
   }
 
-  // Enhanced fixtures with team names
+  // Convert UTC time to IST
+  private convertToIST(utcTime: string): { utc: string; ist: string; istDate: string; istTime: string } {
+    const utcDate = new Date(utcTime);
+    
+    // IST is UTC+5:30
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+    const istDate = new Date(utcDate.getTime() + istOffset);
+    
+    // Format IST date and time
+    const istDateString = istDate.toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      weekday: 'short'
+    });
+    
+    const istTimeString = istDate.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    return {
+      utc: utcTime,
+      ist: istDate.toISOString(),
+      istDate: istDateString,
+      istTime: istTimeString
+    };
+  }
+
+  // Enhanced fixtures with team names and IST times
   async getFixturesWithTeamNames(gameweek?: number): Promise<any[]> {
     const fixtures = await this.getFixtures(gameweek);
     const teams = await this.getTeams();
@@ -327,13 +359,19 @@ class FPLAPIService {
     return fixtures.map(fixture => {
       const homeTeam = teams.find(team => team.id === fixture.team_h);
       const awayTeam = teams.find(team => team.id === fixture.team_a);
+      const kickoffIST = this.convertToIST(fixture.kickoff_time);
       
       return {
         ...fixture,
         team_h_name: homeTeam?.name || 'Unknown',
         team_a_name: awayTeam?.name || 'Unknown',
         team_h_short: homeTeam?.short_name || 'UNK',
-        team_a_short: awayTeam?.short_name || 'UNK'
+        team_a_short: awayTeam?.short_name || 'UNK',
+        kickoff_time_utc: kickoffIST.utc,
+        kickoff_time_ist: kickoffIST.ist,
+        kickoff_time_ist_formatted: `${kickoffIST.istDate} at ${kickoffIST.istTime}`,
+        kickoff_date_ist: kickoffIST.istDate,
+        kickoff_time_ist_only: kickoffIST.istTime
       };
     });
   }

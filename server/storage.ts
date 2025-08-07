@@ -30,15 +30,21 @@ export interface IStorage {
 
   // Gameweek management
   getCurrentGameweek(): Promise<Gameweek | undefined>;
-  getGameweek(gameweekNumber: number): Promise<Gameweek | undefined>;
+  getGameweekByNumber(gameweekNumber: number): Promise<Gameweek | undefined>;
+  getGameweek(gameweekId: number): Promise<Gameweek | undefined>;
   createGameweek(gameweekNumber: number, deadline: Date): Promise<Gameweek>;
   updateGameweekDeadline(gameweekId: number, deadline: Date): Promise<void>;
   updateGameweekStatus(gameweekId: number, isCompleted: boolean): Promise<void>;
 
   // Team management
   getUserTeamForGameweek(userId: number, gameweekId: number): Promise<Team | undefined>;
+  getUserTeams(userId: number): Promise<Team[]>;
+  getUserTeam(userId: number, teamId: number): Promise<Team | undefined>;
+  getUserTeamsForGameweek(userId: number, gameweekId: number): Promise<Team[]>;
   createTeam(teamData: InsertTeam & { userId: number; gameweekId: number }): Promise<Team>;
   updateTeam(teamId: number, updates: Partial<InsertTeam>): Promise<Team>;
+  updateTeamLockStatus(teamId: number, isLocked: boolean): Promise<Team>;
+  deleteTeam(teamId: number): Promise<void>;
   lockTeam(teamId: number): Promise<void>;
 
   // Player selections
@@ -51,6 +57,11 @@ export interface IStorage {
   getGameweekLeaderboard(gameweekId: number, limit?: number): Promise<GameweekResult[]>;
   createGameweekResult(result: Omit<GameweekResult, 'id' | 'createdAt'>): Promise<GameweekResult>;
   getPreviousGameweekWinners(limit?: number): Promise<GameweekResult[]>;
+
+  // Admin functions
+  getAllTeams(): Promise<any[]>;
+  getTeamsForGameweek(gameweekId: number): Promise<any[]>;
+  getAllUsers(): Promise<User[]>;
 
   sessionStore: any;
 }
@@ -109,11 +120,19 @@ async createUser(insertUser: InsertUser): Promise<User> {
     return gameweek || undefined;
   }
 
-  async getGameweek(gameweekNumber: number): Promise<Gameweek | undefined> {
+  async getGameweekByNumber(gameweekNumber: number): Promise<Gameweek | undefined> {
     const [gameweek] = await db
       .select()
       .from(gameweeks)
       .where(eq(gameweeks.gameweekNumber, gameweekNumber));
+    return gameweek || undefined;
+  }
+
+  async getGameweek(gameweekId: number): Promise<Gameweek | undefined> {
+    const [gameweek] = await db
+      .select()
+      .from(gameweeks)
+      .where(eq(gameweeks.id, gameweekId));
     return gameweek || undefined;
   }
 
@@ -168,6 +187,45 @@ async createUser(insertUser: InsertUser): Promise<User> {
     await db
       .update(teams)
       .set({ isLocked: true })
+      .where(eq(teams.id, teamId));
+  }
+
+  async getUserTeams(userId: number): Promise<Team[]> {
+    return await db
+      .select()
+      .from(teams)
+      .where(eq(teams.userId, userId))
+      .orderBy(desc(teams.createdAt));
+  }
+
+  async getUserTeam(userId: number, teamId: number): Promise<Team | undefined> {
+    const [team] = await db
+      .select()
+      .from(teams)
+      .where(and(eq(teams.userId, userId), eq(teams.id, teamId)));
+    return team || undefined;
+  }
+
+  async getUserTeamsForGameweek(userId: number, gameweekId: number): Promise<Team[]> {
+    return await db
+      .select()
+      .from(teams)
+      .where(and(eq(teams.userId, userId), eq(teams.gameweekId, gameweekId)))
+      .orderBy(desc(teams.createdAt));
+  }
+
+  async updateTeamLockStatus(teamId: number, isLocked: boolean): Promise<Team> {
+    const [team] = await db
+      .update(teams)
+      .set({ isLocked })
+      .where(eq(teams.id, teamId))
+      .returning();
+    return team;
+  }
+
+  async deleteTeam(teamId: number): Promise<void> {
+    await db
+      .delete(teams)
       .where(eq(teams.id, teamId));
   }
 
@@ -255,6 +313,61 @@ async createUser(insertUser: InsertUser): Promise<User> {
       ))
       .orderBy(desc(gameweeks.gameweekNumber))
       .limit(limit);
+  }
+
+  // Admin methods
+  async getAllTeams(): Promise<any[]> {
+    return await db
+      .select({
+        id: teams.id,
+        teamName: teams.teamName,
+        formation: teams.formation,
+        totalValue: teams.totalValue,
+        players: teams.players,
+        captainId: teams.captainId,
+        viceCaptainId: teams.viceCaptainId,
+        createdAt: teams.createdAt,
+        isLocked: teams.isLocked,
+        totalPoints: teams.totalPoints,
+        userId: teams.userId,
+        gameweekId: teams.gameweekId,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(teams)
+      .innerJoin(users, eq(teams.userId, users.id))
+      .orderBy(desc(teams.createdAt));
+  }
+
+  async getTeamsForGameweek(gameweekId: number): Promise<any[]> {
+    return await db
+      .select({
+        id: teams.id,
+        teamName: teams.teamName,
+        formation: teams.formation,
+        totalValue: teams.totalValue,
+        players: teams.players,
+        captainId: teams.captainId,
+        viceCaptainId: teams.viceCaptainId,
+        createdAt: teams.createdAt,
+        isLocked: teams.isLocked,
+        totalPoints: teams.totalPoints,
+        userId: teams.userId,
+        gameweekId: teams.gameweekId,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(teams)
+      .innerJoin(users, eq(teams.userId, users.id))
+      .where(eq(teams.gameweekId, gameweekId))
+      .orderBy(desc(teams.createdAt));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt));
   }
 }
 

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FPLPlayer } from "@shared/schema";
-import { Info, Plus, Minus, Search } from "lucide-react";
+import { Info, Plus, Minus, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface PlayerSelectionTableProps {
   players: FPLPlayer[];
@@ -28,7 +28,8 @@ export function PlayerSelectionTable({
   onClose
 }: PlayerSelectionTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"price" | "points" | "form">("price");
+  const [sortBy, setSortBy] = useState<"price" | "points" | "form" | "selected">("price");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterTeam, setFilterTeam] = useState<string>("all");
 
   const getPositionName = (elementType: number) => {
@@ -44,6 +45,20 @@ export function PlayerSelectionTable({
   const getTeamName = (teamId: number) => {
     const team = fplTeams.find(t => t.id === teamId);
     return team ? team.short_name : "Unknown";
+  };
+
+  const handleSort = (column: "price" | "points" | "form" | "selected") => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: "price" | "points" | "form" | "selected" }) => {
+    if (sortBy !== column) return <ArrowUpDown className="h-3 w-3" />;
+    return sortOrder === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
   // Filter and sort players
@@ -65,16 +80,24 @@ export function PlayerSelectionTable({
 
   // Sort players
   filteredPlayers.sort((a, b) => {
+    let result = 0;
     switch (sortBy) {
       case "price":
-        return b.now_cost - a.now_cost;
+        result = a.now_cost - b.now_cost;
+        break;
       case "points":
-        return b.total_points - a.total_points;
+        result = a.total_points - b.total_points;
+        break;
       case "form":
-        return parseFloat(b.form) - parseFloat(a.form);
+        result = parseFloat(a.form) - parseFloat(b.form);
+        break;
+      case "selected":
+        result = parseFloat(a.selected_by_percent) - parseFloat(b.selected_by_percent);
+        break;
       default:
-        return b.now_cost - a.now_cost;
+        result = a.now_cost - b.now_cost;
     }
+    return sortOrder === "asc" ? result : -result;
   });
 
   return (
@@ -133,10 +156,42 @@ export function PlayerSelectionTable({
               <TableRow>
                 <TableHead>Player</TableHead>
                 <TableHead>Team</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Points</TableHead>
-                <TableHead>Form</TableHead>
-                <TableHead>Selected %</TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort("price")}
+                >
+                  <div className="flex items-center gap-1">
+                    Price
+                    <SortIcon column="price" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort("points")}
+                >
+                  <div className="flex items-center gap-1">
+                    Points
+                    <SortIcon column="points" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort("form")}
+                >
+                  <div className="flex items-center gap-1">
+                    Form
+                    <SortIcon column="form" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 select-none"
+                  onClick={() => handleSort("selected")}
+                >
+                  <div className="flex items-center gap-1">
+                    Selected %
+                    <SortIcon column="selected" />
+                  </div>
+                </TableHead>
                 <TableHead>Goals</TableHead>
                 <TableHead>Assists</TableHead>
                 <TableHead className="text-center">Actions</TableHead>

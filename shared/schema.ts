@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  phone: text("phone").notNull(),
   age: integer("age").notNull(),
   gender: text("gender").notNull(),
   isAdmin: boolean("is_admin").default(false),
@@ -115,12 +116,14 @@ export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   password: true,
   name: true,
+  phone: true,
   age: true,
   gender: true,
 }).extend({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(2),
+  phone: z.string().min(10, "Phone number must be at least 10 digits").max(15, "Phone number is too long"),
   age: z.number().min(13).max(100),
   gender: z.enum(["male", "female", "other"]),
 });
