@@ -11,8 +11,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { z } from "zod";
 import { Loader2, Volleyball, Trophy, DollarSign, Target, Zap } from "lucide-react";
-import { TermsAndConditions } from "@/components/terms-conditions";
-import { Help } from "@/components/help";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -64,11 +62,8 @@ export default function AuthPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <Card className="w-full max-w-md glass-card border-white/20">
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <Volleyball className="h-12 w-12 text-fpl-green" />
-            </div>
             <CardTitle className="text-2xl font-bold text-white">
-              {isLogin ? "Welcome Back" : "Join FPL Custom"}
+              {isLogin ? "Welcome Back" : "Join Fantasy Picks"}
             </CardTitle>
             <p className="text-white/70">
               {isLogin ? "Sign in to manage your team" : "Create your account to start playing"}
@@ -241,12 +236,6 @@ export default function AuthPage() {
               </p>
             </div>
             
-            {/* Terms and Help Links */}
-            <div className="flex justify-center items-center space-x-4 text-white/70 text-xs">
-              <TermsAndConditions />
-              <span>•</span>
-              <Help />
-            </div>
           </CardContent>
         </Card>
       </div>

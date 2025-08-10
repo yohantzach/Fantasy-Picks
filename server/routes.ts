@@ -100,7 +100,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           chance_of_playing: chanceOfPlaying,
           news_summary: player.news || '',
           is_available: injuryStatus === 'available',
-          next_opponent: nextOpponent
+          next_opponent: nextOpponent,
+          // Add 1 million to the displayed price for all positions
+          adjusted_price: (player.now_cost / 10) + 1,
+          adjusted_price_formatted: `£${((player.now_cost / 10) + 1).toFixed(1)}m`
         };
       });
       

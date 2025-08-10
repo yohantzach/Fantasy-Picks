@@ -8,16 +8,22 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import PaymentPage from "@/pages/payment";
-import TeamSelection from "@/pages/team-selection-enhanced";
+import TeamSelection from "@/pages/team-selection";
+import EditTeam from "@/pages/edit-team";
 import Leaderboard from "@/pages/leaderboard";
 import Fixtures from "@/pages/fixtures";
+import Teams from "@/pages/teams";
+import AdminDashboard from "@/pages/admin-dashboard";
 
 function Router() {
   return (
     <Switch>
       <ProtectedRoute path="/" component={TeamSelection} />
+      <ProtectedRoute path="/edit-team" component={EditTeam} />
+      <ProtectedRoute path="/teams" component={Teams} />
       <ProtectedRoute path="/leaderboard" component={Leaderboard} />
       <ProtectedRoute path="/fixtures" component={Fixtures} />
+      <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly />
       <Route path="/auth" component={AuthPage} />
       <Route path="/payment" component={PaymentPage} />
       <Route component={NotFound} />

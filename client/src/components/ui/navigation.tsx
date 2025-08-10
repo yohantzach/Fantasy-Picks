@@ -18,6 +18,7 @@ export default function Navigation() {
 
   const navItems = [
     { path: "/", label: "Team Selection", icon: "⚽" },
+    { path: "/edit-team", label: "Edit Team", icon: "✏️" },
     { path: "/teams", label: "My Teams", icon: "👥" },
     { path: "/leaderboard", label: "Leaderboard", icon: "🏆" },
     { path: "/fixtures", label: "Fixtures", icon: "📅" },
@@ -39,10 +40,9 @@ export default function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center space-x-4">
-            <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <Volleyball className="h-8 w-8 text-fpl-green" />
+            <Link href="/" className="hover:opacity-80 transition-opacity">
               <div>
-                <span className="text-white font-bold text-xl">FPL Custom</span>
+                <span className="text-white font-bold text-xl">Fantasy Picks</span>
                 <div className="text-fpl-green text-xs font-medium">Weekly League</div>
               </div>
             </Link>

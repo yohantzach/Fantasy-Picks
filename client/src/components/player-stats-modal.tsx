@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { TooltipHover } from "@/components/ui/tooltip-hover";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { 
   Star, 
   TrendingUp, 
@@ -157,14 +157,19 @@ export function PlayerStatsModal({
             </Card>
             <Card className="bg-white/10 border-white/20">
               <CardContent className="p-3 text-center">
-                <TooltipHover content="Points Per Game">
-                  <div className="cursor-help">
-                    <div className="text-xl font-bold text-white">
-                      {player.points_per_game || "0.0"}
-                    </div>
-                    <div className="text-xs text-gray-300">PPG</div>
-                  </div>
-                </TooltipHover>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <div className="text-xl font-bold text-white">
+                        {player.points_per_game || "0.0"}
+                      </div>
+                      <div className="text-xs text-gray-300">PPG</div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Points Per Game</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </CardContent>
             </Card>
             <Card className="bg-white/10 border-white/20">

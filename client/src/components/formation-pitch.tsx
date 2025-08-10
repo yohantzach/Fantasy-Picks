@@ -8,6 +8,8 @@ interface FormationPitchProps {
   onPositionClick: (elementType: number) => void;
   captainId?: number | null;
   viceCaptainId?: number | null;
+  fplTeams?: any[];
+  formation?: string;
 }
 
 export function FormationPitch({ 
@@ -15,7 +17,8 @@ export function FormationPitch({
   players, 
   onPositionClick, 
   captainId, 
-  viceCaptainId 
+  viceCaptainId,
+  formation = "4-4-2" 
 }: FormationPitchProps) {
   const getPlayersByPosition = (elementType: number) => {
     return selectedPlayers
@@ -34,14 +37,20 @@ export function FormationPitch({
     }
   };
 
+  const getFormationSlots = (formation: string) => {
+    const [def, mid, fwd] = formation.split('-').map(Number);
+    return {
+      1: 1,   // Always 1 GK
+      2: def, // Defenders
+      3: mid, // Midfielders  
+      4: fwd  // Forwards
+    };
+  };
+
+  const formationSlots = getFormationSlots(formation);
+
   const getPositionSlots = (elementType: number) => {
-    switch (elementType) {
-      case 1: return 1; // 1 GK slot
-      case 2: return 4; // 4 DEF slots  
-      case 3: return 4; // 4 MID slots
-      case 4: return 2; // 2 FWD slots
-      default: return 0;
-    }
+    return formationSlots[elementType as keyof typeof formationSlots] || 0;
   };
 
   const PositionRow = ({ elementType }: { elementType: number }) => {
@@ -55,20 +64,25 @@ export function FormationPitch({
         {positionPlayers.map((player) => (
           <div key={player.id} className="relative">
             <Card 
-              className="w-24 h-32 cursor-pointer hover:shadow-md transition-all bg-fpl-green/10 border-fpl-green"
+              className="w-20 h-28 cursor-pointer hover:shadow-md transition-all bg-white border border-gray-300 hover:border-fpl-green"
               onClick={() => onPositionClick(elementType)}
             >
-              <CardContent className="p-2 text-center h-full flex flex-col justify-between">
-                <div>
-                  <div className="text-xs font-semibold truncate">
+              <CardContent className="p-1 text-center h-full flex flex-col justify-between">
+                {/* Price on top */}
+                <div className="text-xs font-bold text-green-600">
+                  £{((player.now_cost / 10) + 1).toFixed(1)}m
+                </div>
+                
+                {/* Player name in middle */}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-xs font-semibold text-gray-800 truncate px-1">
                     {player.web_name}
                   </div>
-                  <Badge variant="outline" className="text-xs mt-1">
-                    £{(player.now_cost / 10).toFixed(1)}m
-                  </Badge>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {player.total_points} pts
+                
+                {/* Fixture at bottom */}
+                <div className="text-xs text-gray-500 font-medium">
+                  {player.next_opponent || 'vs TBD'}
                 </div>
               </CardContent>
             </Card>
@@ -90,11 +104,11 @@ export function FormationPitch({
         {Array.from({ length: emptySlots }).map((_, index) => (
           <Card 
             key={`empty-${elementType}-${index}`}
-            className="w-24 h-32 cursor-pointer hover:shadow-md transition-all border-dashed border-2 border-gray-300 hover:border-fpl-purple"
+            className="w-20 h-28 cursor-pointer hover:shadow-md transition-all border-dashed border-2 border-gray-300 hover:border-fpl-purple bg-white/50"
             onClick={() => onPositionClick(elementType)}
           >
-            <CardContent className="p-2 text-center h-full flex flex-col justify-center">
-              <div className="text-gray-400 text-xs font-medium">
+            <CardContent className="p-1 text-center h-full flex flex-col justify-center">
+              <div className="text-gray-500 text-xs font-medium">
                 + {getPositionLabel(elementType)}
               </div>
             </CardContent>

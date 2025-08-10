@@ -10,9 +10,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Clock, Save, Users, DollarSign, Trophy, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { FormationPitch } from "@/components/formation-pitch";
-import { PlayerSelectionTable } from "@/components/player-selection-table";
+import { EnhancedPlayerSelectionTable } from "@/components/enhanced-player-selection-table";
 import { PlayerStatsModal } from "@/components/player-stats-modal";
-import { Navigation } from "@/components/ui/navigation";
+import Navigation from "@/components/ui/navigation";
+import EnhancedPaymentModal from "@/components/ui/enhanced-payment-modal";
+import { Link } from "wouter";
 
 
 
@@ -24,6 +26,7 @@ export default function TeamSelection() {
   const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
   const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<any>(null);
   const [showPlayerTable, setShowPlayerTable] = useState<number | null>(null);
+  const [formation, setFormation] = useState("4-4-2");
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
@@ -139,6 +142,8 @@ export default function TeamSelection() {
 
     if (isAdding) {
       setSelectedPlayers(prev => [...prev, playerId]);
+      // Close the player table after adding a player
+      setShowPlayerTable(null);
     } else {
       setSelectedPlayers(prev => prev.filter(id => id !== playerId));
       // Remove captain/vice-captain if deselected
@@ -255,10 +260,29 @@ export default function TeamSelection() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Formation - Click on positions to select players</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Formation - Click on positions to select players</CardTitle>
+                  <div className="w-32">
+                    <Select value={formation} onValueChange={setFormation} disabled={isLocked}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3-4-3">3-4-3</SelectItem>
+                        <SelectItem value="3-5-2">3-5-2</SelectItem>
+                        <SelectItem value="4-3-3">4-3-3</SelectItem>
+                        <SelectItem value="4-4-2">4-4-2</SelectItem>
+                        <SelectItem value="4-5-1">4-5-1</SelectItem>
+                        <SelectItem value="5-4-1">5-4-1</SelectItem>
+                        <SelectItem value="5-3-2">5-3-2</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <FormationPitch 
+                  formation={formation}
                   selectedPlayers={selectedPlayers}
                   players={players}
                   onPositionClick={handlePositionClick}
@@ -393,9 +417,9 @@ export default function TeamSelection() {
           </div>
         </div>
       ) : (
-        /* Player Selection Table */
+        /* Enhanced Player Selection Table */
         <div className="space-y-6">
-          <PlayerSelectionTable
+          <EnhancedPlayerSelectionTable
             players={players || []}
             fplTeams={fplTeams || []}
             elementType={showPlayerTable}
@@ -403,6 +427,7 @@ export default function TeamSelection() {
             onPlayerToggle={handlePlayerToggle}
             onPlayerStats={setSelectedPlayerForStats}
             onClose={handleClosePlayerTable}
+            currentGameweek={currentGameweek}
           />
         </div>
       )}
