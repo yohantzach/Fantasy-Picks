@@ -29,14 +29,6 @@ export function ProtectedRoute({
     );
   }
 
-  // Check if user has paid (admin users bypass this check)
-  if (!user.isAdmin && !user.hasPaid) {
-    return (
-      <Route path={path}>
-        <Redirect to="/payment" />
-      </Route>
-    );
-  }
 
   return <Route path={path} component={Component} />;
 }

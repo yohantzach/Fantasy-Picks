@@ -157,12 +157,21 @@ export default function TeamSelection() {
       const response = await apiRequest("POST", "/api/team/save", teamData);
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Team Saved",
-        description: "Your team has been saved successfully!",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
+    onSuccess: (data: any) => {
+      if (data.requiresPayment) {
+        toast({
+          title: "Team Validated! 🎉",
+          description: "Redirecting to payment to complete your team registration...",
+        });
+        // Redirect to payment page with UPI details
+        window.location.href = data.redirectTo;
+      } else {
+        toast({
+          title: "Team Saved Successfully! 🎉",
+          description: "Your team has been registered and is ready for scoring!",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
+      }
     },
     onError: (error: any) => {
       toast({

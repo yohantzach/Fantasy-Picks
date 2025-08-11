@@ -39,8 +39,9 @@ app.use(cookieParser());
   // Register team management routes
   app.use("/api/teams", teamsRouter);
   
-  // Register payment routes
+  // Register payment routes for manual payment system
   app.use("/api/payment", paymentRouter);
+  
 
   // Hybrid FPL Data endpoints with automatic fallback between FPL API and API-Football
   app.get("/api/fpl/players", async (req, res) => {
@@ -422,6 +423,131 @@ app.use(cookieParser());
     }
   });
 
+  // Team save endpoint - validates team and redirects to payment
+  app.post("/api/team/save", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const currentGameweek = await storage.getCurrentGameweek();
+      if (!currentGameweek) {
+        return res.status(404).json({ error: "No active gameweek" });
+      }
+
+      // Check if deadline has passed
+      if (new Date() > currentGameweek.deadline) {
+        return res.status(403).json({ error: "Gameweek deadline has passed" });
+      }
+      
+      const teamData = insertTeamSchema.parse(req.body);
+      
+      // Validate team constraints
+      if (teamData.players && teamData.players.length !== 11) {
+        return res.status(400).json({ error: "Team must have exactly 11 players" });
+      }
+      
+      // Validate budget constraint
+      const players = await fplAPI.getPlayers();
+      const selectedPlayers = players.filter((p: any) => teamData.players?.includes(p.id));
+      const totalCost = selectedPlayers.reduce((sum: number, p: any) => sum + p.now_cost, 0);
+      
+      if (totalCost > 1000) { // 100.0m in API units
+        return res.status(400).json({ error: "Team exceeds budget limit" });
+      }
+      
+      // Validate max 3 players per team
+      const teamCounts = new Map();
+      selectedPlayers.forEach((player: any) => {
+        const count = teamCounts.get(player.team) || 0;
+        teamCounts.set(player.team, count + 1);
+      });
+      
+      for (const [teamId, count] of Array.from(teamCounts.entries())) {
+        if (count > 3) {
+          return res.status(400).json({ error: "Maximum 3 players allowed from the same team" });
+        }
+      }
+      
+      // Store team data temporarily in session for after payment
+      req.session.pendingTeam = {
+        ...teamData,
+        gameweekId: currentGameweek.id
+      };
+      
+      // Redirect to payment flow
+      res.json({ 
+        success: true,
+        requiresPayment: true,
+        redirectTo: "/manual-payment",
+        message: "Team validated successfully. Please complete payment to register your team.",
+        gameweekId: currentGameweek.id,
+        amount: 20
+      });
+    } catch (error) {
+      console.error("Error validating team:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid team data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to validate team" });
+    }
+  });
+
+  // Complete team registration after payment approval
+  app.post("/api/team/complete-registration", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { paymentProofId } = req.body;
+      
+      // Verify payment proof is approved
+      const [proof] = await db
+        .select()
+        .from(paymentProofs)
+        .where(
+          and(
+            eq(paymentProofs.id, paymentProofId),
+            eq(paymentProofs.userId, req.user!.id),
+            eq(paymentProofs.status, 'approved')
+          )
+        )
+        .limit(1);
+        
+      if (!proof) {
+        return res.status(400).json({ error: "Payment proof not found or not approved" });
+      }
+      
+      // Get pending team data from session or reconstruct from payment proof
+      const teamData = req.session.pendingTeam;
+      if (!teamData) {
+        return res.status(400).json({ error: "No pending team data found" });
+      }
+      
+      // Create the team
+      const [newTeam] = await db
+        .insert(teams)
+        .values({
+          ...teamData,
+          userId: req.user!.id,
+          teamNumber: proof.teamNumber,
+          isActive: true
+        })
+        .returning();
+        
+      // Link payment proof to team
+      await db
+        .update(paymentProofs)
+        .set({ teamId: newTeam.id })
+        .where(eq(paymentProofs.id, paymentProofId));
+        
+      // Clear pending team data
+      delete req.session.pendingTeam;
+      
+      res.json(newTeam);
+    } catch (error) {
+      console.error("Error completing team registration:", error);
+      res.status(500).json({ error: "Failed to complete team registration" });
+    }
+  });
+
   app.post("/api/team", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
@@ -449,7 +575,7 @@ app.use(cookieParser());
           return res.status(402).json({ 
             error: "Payment required", 
             message: "Please complete payment for this gameweek to create teams",
-            redirectTo: "/payment",
+            redirectTo: "/manual-payment",
             gameweekId: currentGameweek.id
           });
         }

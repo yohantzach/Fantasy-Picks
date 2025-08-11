@@ -7,7 +7,6 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
-import PaymentPage from "@/pages/payment";
 import TeamSelection from "@/pages/team-selection";
 import EditTeam from "@/pages/edit-team";
 import Leaderboard from "@/pages/leaderboard";
@@ -15,6 +14,7 @@ import Fixtures from "@/pages/fixtures";
 import Teams from "@/pages/teams";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
+import ManualPaymentPage from "@/pages/manual-payment-page";
 
 function Router() {
   return (
@@ -27,7 +27,7 @@ function Router() {
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/payment" component={PaymentPage} />
+      <ProtectedRoute path="/manual-payment" component={ManualPaymentPage} />
       <Route component={NotFound} />
     </Switch>
   );
