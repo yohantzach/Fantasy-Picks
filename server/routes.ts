@@ -3,6 +3,10 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { fplAPI } from "./fpl-api";
+import { enhancedFplAPI } from "./enhanced-fpl-api";
+import { hybridFplService } from "./hybrid-fpl-service";
+import { apiUsageMonitor } from "./api-usage-monitor";
+import { sessionManager } from "./enhanced-session-manager";
 import { insertTeamSchema, insertPlayerSelectionSchema } from "@shared/schema";
 import { z } from "zod";
 import teamsRouter from "./routes/teams";
@@ -28,15 +32,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register team management routes
   app.use("/api/teams", teamsRouter);
 
-  // FPL Data endpoints with hourly caching
+  // Hybrid FPL Data endpoints with automatic fallback between FPL API and API-Football
   app.get("/api/fpl/players", async (req, res) => {
     try {
-      const players = await fplAPI.getPlayers();
-      const teams = await fplAPI.getTeams();
+      const players = await hybridFplService.getPlayers();
+      const teams = await hybridFplService.getTeams();
       
       // Get current gameweek fixtures
-      const currentGameweek = await fplAPI.getCurrentGameweek();
-      const fixtures = await fplAPI.getFixturesWithTeamNames(currentGameweek.id);
+      const currentGameweek = await hybridFplService.getCurrentGameweek();
+      const fixtures = await hybridFplService.getFixtures(currentGameweek.id);
       
       // Add team information and injury status to players
       const playersWithTeams = players.map(player => {
@@ -116,7 +120,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/fpl/teams", async (req, res) => {
     try {
-      const teams = await fplAPI.getTeams();
+      // Use hybrid service with enhanced caching and rate limiting
+      const teams = await hybridFplService.getTeams();
       res.json(teams);
     } catch (error) {
       console.error("Error fetching teams:", error);
@@ -124,11 +129,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Updated fixtures endpoint with gameweek parameter
+  // Enhanced fixtures endpoint with hybrid service, rate limiting and intelligent caching
   app.get("/api/fpl/fixtures/:gameweek?", async (req, res) => {
     try {
       const gameweek = req.params.gameweek ? parseInt(req.params.gameweek) : undefined;
-      const fixtures = await fplAPI.getFixturesWithTeamNames(gameweek);
+      
+      // Use hybrid service with automatic fallback and enhanced caching
+      const fixtures = await hybridFplService.getFixturesWithTeamNames(gameweek);
+      
+      // Add response headers for cache information
+      const cacheStats = hybridFplService.getComprehensiveStatus();
+      const currentSource = hybridFplService.getCurrentSource();
+      
+      res.set({
+        'X-Data-Source': currentSource,
+        'X-Cache-Status': fixtures.length > 0 ? 'HIT' : 'MISS',
+        'X-Rate-Limit-Remaining': cacheStats.sources[currentSource]?.stats?.rateLimiting?.remainingRequests || 'unknown'
+      });
+      
       res.json(fixtures);
     } catch (error) {
       console.error("Error fetching fixtures:", error);
@@ -136,14 +154,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cache statistics endpoint for monitoring
+  // Enhanced cache statistics endpoint for monitoring
   app.get("/api/fpl/cache-stats", async (req, res) => {
     try {
-      const stats = fplAPI.getCacheStats();
-      res.json(stats);
+      const enhancedStats = enhancedFplAPI.getCacheStats();
+      const legacyStats = fplAPI.getCacheStats();
+      
+      res.json({
+        enhanced: enhancedStats,
+        legacy: legacyStats,
+        comparison: {
+          enhancedCacheHits: enhancedStats.memory.totalHits + enhancedStats.persistent.totalHits,
+          legacyCacheSize: legacyStats.cacheSize,
+          enhancedQueueSize: enhancedStats.queue.size
+        }
+      });
     } catch (error) {
       console.error("Error fetching cache stats:", error);
       res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+  
+  // API Usage monitoring endpoints for Basic plan optimization
+  app.get("/api/admin/usage-stats", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const usageStats = apiUsageMonitor.getUsageStats();
+      const cacheEfficiency = apiUsageMonitor.getCacheEfficiency();
+      const quotaStatus = apiUsageMonitor.getQuotaStatus();
+      
+      res.json({
+        usage: usageStats,
+        cache: cacheEfficiency,
+        quota: quotaStatus,
+        recommendations: {
+          upgrade: quotaStatus.projected.willExceed,
+          cacheOptimization: cacheEfficiency.hitRate < 80,
+          emergencyCaching: quotaStatus.monthly.percentUsed > 90
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching usage stats:", error);
+      res.status(500).json({ error: "Failed to fetch usage stats" });
+    }
+  });
+  
+  // Deadline traffic simulation endpoint
+  app.post("/api/admin/simulate-deadline", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const { userCount } = req.body;
+      
+      if (!userCount || userCount < 1 || userCount > 1000) {
+        return res.status(400).json({ error: "User count must be between 1 and 1000" });
+      }
+      
+      const simulation = apiUsageMonitor.simulateDeadlineTraffic(userCount);
+      const currentQuota = apiUsageMonitor.getQuotaStatus();
+      
+      res.json({
+        ...simulation,
+        currentUsage: currentQuota,
+        planRecommendation: simulation.willExceedQuota ? {
+          action: 'upgrade',
+          plan: 'Pro',
+          reason: 'Basic plan insufficient for expected traffic'
+        } : {
+          action: 'optimize',
+          strategies: ['pre-cache data', 'extend cache TTLs', 'enable emergency caching']
+        }
+      });
+    } catch (error) {
+      console.error("Error simulating deadline traffic:", error);
+      res.status(500).json({ error: "Failed to simulate traffic" });
+    }
+  });
+  
+  // Emergency caching control
+  app.post("/api/admin/emergency-caching", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      apiUsageMonitor.enableEmergencyCaching();
+      
+      res.json({
+        message: "Emergency caching enabled",
+        status: "All cache TTLs extended by 4x",
+        reason: "Conserving API quota during high traffic"
+      });
+    } catch (error) {
+      console.error("Error enabling emergency caching:", error);
+      res.status(500).json({ error: "Failed to enable emergency caching" });
+    }
+  });
+  
+  // Session analytics endpoint for admin monitoring
+  app.get("/api/admin/session-analytics", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const analytics = sessionManager.getAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching session analytics:", error);
+      res.status(500).json({ error: "Failed to fetch session analytics" });
+    }
+  });
+  
+  // Enhanced API monitoring endpoint with hybrid service status
+  app.get("/api/admin/api-status", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const hybridStatus = hybridFplService.getComprehensiveStatus();
+      const sessionStats = sessionManager.getAnalytics();
+      
+      const status = {
+        hybrid: hybridStatus,
+        sessions: {
+          active: sessionStats.activeSessions,
+          total: sessionStats.totalSessions,
+          unique: sessionStats.uniqueUsers,
+          averageDuration: Math.round(sessionStats.averageSessionDuration / 1000 / 60), // minutes
+          securityEvents: sessionStats.securityEvents.length
+        },
+        health: {
+          status: hybridStatus.sources['fpl-official']?.status?.available || hybridStatus.sources['api-football']?.status?.available ? 'healthy' : 'degraded',
+          uptime: process.uptime(),
+          memory: process.memoryUsage()
+        }
+      };
+      
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching API status:", error);
+      res.status(500).json({ error: "Failed to fetch API status" });
+    }
+  });
+  
+  // Hybrid service control endpoints
+  app.post("/api/admin/api/switch-source", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const { source } = req.body;
+      
+      if (!['fpl-official', 'api-football'].includes(source)) {
+        return res.status(400).json({ error: 'Invalid data source. Must be fpl-official or api-football' });
+      }
+      
+      await hybridFplService.switchSource(source);
+      res.json({ 
+        message: `Successfully switched to ${source}`,
+        currentSource: hybridFplService.getCurrentSource()
+      });
+    } catch (error) {
+      console.error("Error switching data source:", error);
+      res.status(500).json({ error: error.message || "Failed to switch data source" });
+    }
+  });
+  
+  app.get("/api/admin/api/source-status", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const sourceStatus = Array.from(hybridFplService.getSourceStatus().entries()).map(([name, status]) => ({
+        name,
+        ...status,
+        lastSuccessFormatted: new Date(status.lastSuccess).toISOString(),
+        lastErrorFormatted: status.lastError ? new Date(status.lastError).toISOString() : null,
+        nextAvailableFormatted: status.nextAvailable ? new Date(status.nextAvailable).toISOString() : null
+      }));
+      
+      res.json({
+        currentSource: hybridFplService.getCurrentSource(),
+        sources: sourceStatus
+      });
+    } catch (error) {
+      console.error("Error fetching source status:", error);
+      res.status(500).json({ error: "Failed to fetch source status" });
+    }
+  });
+  
+  // API-Football specific endpoints
+  app.get("/api/admin/api-football/status", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const { apiFootballService } = await import('./api-football-service');
+      const rateLimitStatus = apiFootballService.getRateLimitStatus();
+      const cacheStats = apiFootballService.getCacheStats();
+      
+      res.json({
+        rateLimits: rateLimitStatus,
+        cache: cacheStats,
+        configured: !!process.env.API_FOOTBALL_KEY
+      });
+    } catch (error) {
+      console.error("Error fetching API-Football status:", error);
+      res.status(500).json({ error: "Failed to fetch API-Football status" });
     }
   });
 
