@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import cookieParser from "cookie-parser";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { fplAPI } from "./fpl-api";
@@ -7,11 +8,12 @@ import { enhancedFplAPI } from "./enhanced-fpl-api";
 import { hybridFplService } from "./hybrid-fpl-service";
 import { apiUsageMonitor } from "./api-usage-monitor";
 import { sessionManager } from "./enhanced-session-manager";
-import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults } from "@shared/schema";
+import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults, paymentProofs } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import teamsRouter from "./routes/teams";
+import paymentRouter from "./src/routes/payment";
 
 // Helper functions
 function getPositionName(elementType: number): string {
@@ -31,8 +33,14 @@ function formatPrice(price: number): string {
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
+  // Add cookie parser middleware for payment routes
+app.use(cookieParser());
+  
   // Register team management routes
   app.use("/api/teams", teamsRouter);
+  
+  // Register payment routes
+  app.use("/api/payment", paymentRouter);
 
   // Hybrid FPL Data endpoints with automatic fallback between FPL API and API-Football
   app.get("/api/fpl/players", async (req, res) => {
@@ -418,14 +426,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
-      // Check if user has paid (unless admin)
-      if (!req.user!.isAdmin && !req.user!.hasPaid) {
-        return res.status(403).json({ error: "Payment required" });
-      }
-      
       const currentGameweek = await storage.getCurrentGameweek();
       if (!currentGameweek) {
         return res.status(404).json({ error: "No active gameweek" });
+      }
+
+      // Check if user has paid for this gameweek (unless admin)
+      if (!req.user!.isAdmin) {
+        const approvedPayment = await db
+          .select()
+          .from(paymentProofs)
+          .where(
+            and(
+              eq(paymentProofs.userId, req.user!.id),
+              eq(paymentProofs.gameweekId, currentGameweek.id),
+              eq(paymentProofs.status, 'approved')
+            )
+          )
+          .limit(1);
+
+        if (approvedPayment.length === 0) {
+          return res.status(402).json({ 
+            error: "Payment required", 
+            message: "Please complete payment for this gameweek to create teams",
+            redirectTo: "/payment",
+            gameweekId: currentGameweek.id
+          });
+        }
       }
       
       // Check if deadline has passed
@@ -434,6 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const teamData = insertTeamSchema.parse(req.body);
+      const { teamNumber } = req.body; // Get team number from request
       
       // Validate team constraints
       if (teamData.players && teamData.players.length !== 11) {
@@ -462,19 +490,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Check if user already has a team for this gameweek
-      let team = await storage.getUserTeamForGameweek(req.user!.id, currentGameweek.id);
+      // Check if user already has this specific team number for this gameweek
+      const existingTeam = await db
+        .select()
+        .from(teams)
+        .where(
+          and(
+            eq(teams.userId, req.user!.id),
+            eq(teams.gameweekId, currentGameweek.id),
+            eq(teams.teamNumber, teamNumber || 1)
+          )
+        )
+        .limit(1);
       
-      if (team) {
+      let team;
+      if (existingTeam.length > 0) {
         // Update existing team
-        team = await storage.updateTeam(team.id, teamData);
+        const [updatedTeam] = await db
+          .update(teams)
+          .set({
+            ...teamData,
+            teamNumber: teamNumber || 1
+          })
+          .where(eq(teams.id, existingTeam[0].id))
+          .returning();
+        team = updatedTeam;
       } else {
         // Create new team
-        team = await storage.createTeam({
-          ...teamData,
-          userId: req.user!.id,
-          gameweekId: currentGameweek.id,
-        });
+        const [newTeam] = await db
+          .insert(teams)
+          .values({
+            ...teamData,
+            userId: req.user!.id,
+            gameweekId: currentGameweek.id,
+            teamNumber: teamNumber || 1,
+            isActive: true
+          })
+          .returning();
+        team = newTeam;
       }
       
       res.json(team);
@@ -515,46 +568,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment processing
-  app.post("/api/payment/confirm", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
-    try {
-      const { paymentId, amount } = req.body;
-      
-      // In production, verify payment with payment gateway
-      // For now, we'll accept any paymentId as valid
-      if (!paymentId || amount !== 20) {
-        return res.status(400).json({ error: "Invalid payment details" });
-      }
-      
-      await storage.updateUserPayment(req.user!.id, paymentId);
-      res.json({ success: true, message: "Payment confirmed successfully" });
-    } catch (error) {
-      console.error("Error confirming payment:", error);
-      res.status(500).json({ error: "Failed to confirm payment" });
-    }
-  });
-
-  app.post("/api/payment/verify", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
-    try {
-      const { paymentId } = req.body;
-      
-      // In production, verify payment with Razorpay
-      // For now, we'll accept any paymentId as valid
-      if (!paymentId) {
-        return res.status(400).json({ error: "Payment ID required" });
-      }
-      
-      await storage.updateUserPayment(req.user!.id, paymentId);
-      res.json({ success: true, message: "Payment verified successfully" });
-    } catch (error) {
-      console.error("Error verifying payment:", error);
-      res.status(500).json({ error: "Failed to verify payment" });
-    }
-  });
 
   // User Profile endpoints
   app.get("/api/user/gameweek-history", async (req, res) => {

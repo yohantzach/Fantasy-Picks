@@ -1,6 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
+import { db } from "../db";
+import { paymentProofs } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -78,6 +81,39 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Cannot create team after deadline" });
     }
 
+    // Check team count limit (assuming max 5 teams per user per gameweek)
+    const existingTeams = await storage.getUserTeamsForGameweek(userId, currentGameweek.id);
+    const nextTeamNumber = existingTeams.length + 1;
+    
+    if (nextTeamNumber > 5) {
+      return res.status(400).json({ error: "Maximum 5 teams allowed per gameweek" });
+    }
+
+    // **CRITICAL: Check if payment has been approved for this specific team**
+    const paymentProof = await db
+      .select()
+      .from(paymentProofs)
+      .where(
+        and(
+          eq(paymentProofs.userId, userId),
+          eq(paymentProofs.gameweekId, currentGameweek.id),
+          eq(paymentProofs.teamNumber, nextTeamNumber),
+          eq(paymentProofs.status, 'approved')
+        )
+      )
+      .limit(1);
+
+    if (paymentProof.length === 0) {
+      return res.status(402).json({
+        error: "Payment required",
+        message: `You need to pay ₹20 for team ${nextTeamNumber}. Please complete payment verification first.`,
+        redirectTo: `/payment?gameweek=${currentGameweek.id}&team=${nextTeamNumber}`,
+        requiresPayment: true,
+        gameweekId: currentGameweek.id,
+        teamNumber: nextTeamNumber
+      });
+    }
+
     // Validate captain and vice captain are different
     if (teamData.captainId === teamData.viceCaptainId) {
       return res.status(400).json({ error: "Captain and vice captain must be different players" });
@@ -92,26 +128,27 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Vice captain must be one of the selected players" });
     }
 
-    // Check team count limit (assuming max 5 teams per user per gameweek)
-    const existingTeams = await storage.getUserTeamsForGameweek(userId, currentGameweek.id);
-    if (existingTeams.length >= 5) {
-      return res.status(400).json({ error: "Maximum 5 teams allowed per gameweek" });
-    }
-
     // Check if team name is unique for the user in this gameweek
     const existingTeamName = existingTeams.find(team => team.teamName === teamData.teamName);
     if (existingTeamName) {
       return res.status(400).json({ error: "Team name already exists for this gameweek" });
     }
 
-    // Create the team
+    // Create the team with the correct team number
     const newTeam = await storage.createTeam({
       ...teamData,
       userId,
       gameweekId: currentGameweek.id,
+      teamNumber: nextTeamNumber,
       isLocked: false,
       totalPoints: 0,
     });
+
+    // Update the payment proof to link it to the created team
+    await db
+      .update(paymentProofs)
+      .set({ teamId: newTeam.id })
+      .where(eq(paymentProofs.id, paymentProof[0].id));
 
     res.status(201).json(newTeam);
   } catch (error) {

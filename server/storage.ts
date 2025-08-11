@@ -41,7 +41,7 @@ export interface IStorage {
   getUserTeams(userId: number): Promise<Team[]>;
   getUserTeam(userId: number, teamId: number): Promise<Team | undefined>;
   getUserTeamsForGameweek(userId: number, gameweekId: number): Promise<Team[]>;
-  createTeam(teamData: InsertTeam & { userId: number; gameweekId: number }): Promise<Team>;
+  createTeam(teamData: InsertTeam & { userId: number; gameweekId: number; teamNumber?: number }): Promise<Team>;
   updateTeam(teamId: number, updates: Partial<InsertTeam>): Promise<Team>;
   updateTeamLockStatus(teamId: number, isLocked: boolean): Promise<Team>;
   deleteTeam(teamId: number): Promise<void>;

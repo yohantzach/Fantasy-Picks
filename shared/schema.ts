@@ -38,6 +38,8 @@ export const teams = pgTable("teams", {
   viceCaptainId: integer("vice_captain_id"),
   totalPoints: integer("total_points").default(0),
   isLocked: boolean("is_locked").default(false),
+  teamNumber: integer("team_number").notNull().default(1), // Allow multiple teams
+  isActive: boolean("is_active").default(true), // Track which team is currently active
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -65,10 +67,40 @@ export const gameweekResults = pgTable("gameweek_results", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const paymentProofs = pgTable("payment_proofs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  gameweekId: integer("gameweek_id").references(() => gameweeks.id).notNull(), // Still need gameweek for context
+  teamId: integer("team_id").references(() => teams.id), // Payment per team (null for initial payment, set after team creation)
+  teamNumber: integer("team_number").notNull().default(1), // Which team number this payment is for
+  paymentMethod: text("payment_method").notNull(),
+  transactionId: text("transaction_id").notNull(),
+  amount: decimal("amount", { precision: 8, scale: 2 }).notNull(),
+  notes: text("notes"),
+  proofFilePath: text("proof_file_path"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: integer("verified_by").references(() => users.id),
+  adminNotes: text("admin_notes"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   teams: many(teams),
   gameweekResults: many(gameweekResults),
+  paymentProofs: many(paymentProofs),
+}));
+
+export const paymentProofsRelations = relations(paymentProofs, ({ one }) => ({
+  user: one(users, {
+    fields: [paymentProofs.userId],
+    references: [users.id],
+  }),
+  verifier: one(users, {
+    fields: [paymentProofs.verifiedBy],
+    references: [users.id],
+  }),
 }));
 
 export const gameweeksRelations = relations(gameweeks, ({ many }) => ({
@@ -155,6 +187,7 @@ export type PlayerSelection = typeof playerSelections.$inferSelect;
 export type InsertPlayerSelection = z.infer<typeof insertPlayerSelectionSchema>;
 export type Gameweek = typeof gameweeks.$inferSelect;
 export type GameweekResult = typeof gameweekResults.$inferSelect;
+export type PaymentProof = typeof paymentProofs.$inferSelect;
 
 // FPL Player type for API integration
 export type FPLPlayer = {
