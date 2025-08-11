@@ -98,13 +98,16 @@ export default function Navigation() {
               </div>
               
               {/* User Avatar */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-10 h-10 p-0 bg-fpl-green rounded-full text-white hover:bg-green-600 transition-colors"
-              >
-                <User className="h-5 w-5" />
-              </Button>
+              <Link href="/profile">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-10 h-10 p-0 bg-fpl-green rounded-full text-white hover:bg-green-600 transition-colors"
+                  title="View Profile"
+                >
+                  <User className="h-5 w-5" />
+                </Button>
+              </Link>
               
               {/* Logout Button */}
               <Button

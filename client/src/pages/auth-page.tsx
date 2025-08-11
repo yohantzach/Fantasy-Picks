@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema, type InsertUser } from "@shared/schema";
 import { z } from "zod";
 import { Loader2, Volleyball, Trophy, DollarSign, Target, Zap } from "lucide-react";
+import { PoliciesModal } from "@/components/ui/policies-modal";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -22,6 +24,7 @@ type LoginData = z.infer<typeof loginSchema>;
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const loginForm = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
@@ -101,8 +104,6 @@ export default function AuthPage() {
                   )}
                 </div>
                 
-
-
                 <Button
                   type="submit"
                   className="w-full bg-fpl-green hover:bg-green-600 text-white"
@@ -113,6 +114,20 @@ export default function AuthPage() {
                   ) : null}
                   Sign In
                 </Button>
+                
+                {/* Terms and Conditions link for login */}
+                <div className="text-center mt-4">
+                  <p className="text-white/70 text-xs">
+                    By signing in, you agree to our{" "}
+                    <PoliciesModal 
+                      trigger={
+                        <button type="button" className="text-fpl-green hover:text-green-400 underline font-medium">
+                          Terms & Conditions, Privacy Policy, and Refund Policy
+                        </button>
+                      }
+                    />
+                  </p>
+                </div>
               </form>
             ) : (
               <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
@@ -205,10 +220,40 @@ export default function AuthPage() {
                     )}
                   </div>
                 </div>
+                
+                {/* Terms and Conditions Acceptance */}
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox 
+                      id="terms"
+                      checked={acceptedTerms}
+                      onCheckedChange={setAcceptedTerms}
+                      className="border-white/30 data-[state=checked]:bg-fpl-green data-[state=checked]:border-fpl-green mt-1"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="terms" className="text-white text-sm leading-relaxed cursor-pointer">
+                        I agree to the{" "}
+                        <PoliciesModal 
+                          trigger={
+                            <button type="button" className="text-fpl-green hover:text-green-400 underline font-medium">
+                              Terms & Conditions, Privacy Policy, and Refund Policy
+                            </button>
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  {!acceptedTerms && (
+                    <p className="text-yellow-400 text-xs ml-6">
+                      You must accept the terms and conditions to create an account
+                    </p>
+                  )}
+                </div>
+                
                 <Button
                   type="submit"
                   className="w-full bg-fpl-green hover:bg-green-600 text-white"
-                  disabled={registerMutation.isPending}
+                  disabled={registerMutation.isPending || !acceptedTerms}
                 >
                   {registerMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

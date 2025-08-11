@@ -14,6 +14,7 @@ import Leaderboard from "@/pages/leaderboard";
 import Fixtures from "@/pages/fixtures";
 import Teams from "@/pages/teams";
 import AdminDashboard from "@/pages/admin-dashboard";
+import ProfilePage from "@/pages/profile-page";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <ProtectedRoute path="/teams" component={Teams} />
       <ProtectedRoute path="/leaderboard" component={Leaderboard} />
       <ProtectedRoute path="/fixtures" component={Fixtures} />
+      <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly />
       <Route path="/auth" component={AuthPage} />
       <Route path="/payment" component={PaymentPage} />

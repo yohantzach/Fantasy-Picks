@@ -7,8 +7,10 @@ import { enhancedFplAPI } from "./enhanced-fpl-api";
 import { hybridFplService } from "./hybrid-fpl-service";
 import { apiUsageMonitor } from "./api-usage-monitor";
 import { sessionManager } from "./enhanced-session-manager";
-import { insertTeamSchema, insertPlayerSelectionSchema } from "@shared/schema";
+import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults } from "@shared/schema";
 import { z } from "zod";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import teamsRouter from "./routes/teams";
 
 // Helper functions
@@ -551,6 +553,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error verifying payment:", error);
       res.status(500).json({ error: "Failed to verify payment" });
+    }
+  });
+
+  // User Profile endpoints
+  app.get("/api/user/gameweek-history", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const userTeams = await storage.getUserTeams(req.user!.id);
+      
+      const gameweekHistory = await Promise.all(
+        userTeams.map(async (team) => {
+          const gameweek = await storage.getGameweek(team.gameweekId);
+          const leaderboard = await storage.getGameweekLeaderboard(team.gameweekId, 1000);
+          const userResult = leaderboard.find(result => result.teamId === team.id);
+          
+          return {
+            id: team.id,
+            gameweekNumber: gameweek?.gameweekNumber || 0,
+            teamName: team.teamName,
+            points: team.totalPoints || 0,
+            rank: userResult?.rank || 0,
+            totalParticipants: leaderboard.length,
+            hasPaid: req.user!.hasPaid,
+            createdAt: team.createdAt
+          };
+        })
+      );
+      
+      res.json(gameweekHistory.sort((a, b) => b.gameweekNumber - a.gameweekNumber));
+    } catch (error) {
+      console.error("Error fetching user gameweek history:", error);
+      res.status(500).json({ error: "Failed to fetch gameweek history" });
+    }
+  });
+
+  app.get("/api/user/payment-history", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      // For now, we'll create mock payment history based on user teams
+      // In a real implementation, you'd have a payments table
+      const userTeams = await storage.getUserTeams(req.user!.id);
+      
+      const paymentHistory = await Promise.all(
+        userTeams.map(async (team, index) => {
+          const gameweek = await storage.getGameweek(team.gameweekId);
+          
+          return {
+            id: team.id,
+            gameweekNumber: gameweek?.gameweekNumber || 0,
+            amount: 20,
+            status: req.user!.hasPaid ? "success" : "pending",
+            paymentMethod: "Razorpay",
+            transactionId: req.user!.paymentId || `TXN${team.id}${Date.now()}`,
+            createdAt: team.createdAt
+          };
+        })
+      );
+      
+      res.json(paymentHistory.sort((a, b) => b.gameweekNumber - a.gameweekNumber));
+    } catch (error) {
+      console.error("Error fetching user payment history:", error);
+      res.status(500).json({ error: "Failed to fetch payment history" });
+    }
+  });
+
+  app.patch("/api/user/profile", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { name, phone } = req.body;
+      
+      if (!name || !phone) {
+        return res.status(400).json({ error: "Name and phone are required" });
+      }
+      
+      await db
+        .update(users)
+        .set({ name, phone })
+        .where(eq(users.id, req.user!.id));
+        
+      const updatedUser = await storage.getUser(req.user!.id);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.delete("/api/user/account", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const userId = req.user!.id;
+      
+      // Delete user's teams and player selections
+      const userTeams = await storage.getUserTeams(userId);
+      
+      for (const team of userTeams) {
+        // Delete player selections for each team
+        await db
+          .delete(playerSelections)
+          .where(eq(playerSelections.teamId, team.id));
+      }
+      
+      // Delete user's teams
+      await db
+        .delete(teams)
+        .where(eq(teams.userId, userId));
+      
+      // Delete gameweek results
+      await db
+        .delete(gameweekResults)
+        .where(eq(gameweekResults.userId, userId));
+      
+      // Finally, delete the user account
+      await db
+        .delete(users)
+        .where(eq(users.id, userId));
+        
+      res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user account:", error);
+      res.status(500).json({ error: "Failed to delete account" });
     }
   });
 
