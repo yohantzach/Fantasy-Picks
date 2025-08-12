@@ -15,6 +15,7 @@ import Teams from "@/pages/teams";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
 import ManualPaymentPage from "@/pages/manual-payment-page";
+import AdminPaymentPanel from "@/pages/admin-payment-panel";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <ProtectedRoute path="/fixtures" component={Fixtures} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly />
+      <ProtectedRoute path="/admin/payments" component={AdminPaymentPanel} adminOnly />
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/manual-payment" component={ManualPaymentPage} />
       <Route component={NotFound} />

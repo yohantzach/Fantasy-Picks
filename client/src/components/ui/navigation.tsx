@@ -16,12 +16,29 @@ export default function Navigation() {
     queryKey: ["/api/gameweek/current"],
   });
 
+  // Fetch user teams to determine edit team link
+  const { data: userTeams = [] } = useQuery({
+    queryKey: ["/api/teams/user"],
+    enabled: !!user,
+  });
+
+  // Find the first team with approved payment (editable team)
+  const editableTeam = userTeams.find(team => team.paymentStatus === 'approved');
+
   const navItems = [
-    { path: "/", label: "Team Selection", icon: "⚽" },
-    { path: "/edit-team", label: "Edit Team", icon: "✏️" },
-    { path: "/teams", label: "My Teams", icon: "👥" },
+    { path: "/", label: "Create Team", icon: "⚽" },
+    { 
+      path: editableTeam ? `/edit-team?team=${editableTeam.teamNumber}` : "/edit-team", 
+      label: "Edit Team", 
+      icon: "✏️" 
+    },
     { path: "/leaderboard", label: "Leaderboard", icon: "🏆" },
     { path: "/fixtures", label: "Fixtures", icon: "📅" },
+  ];
+
+  const adminNavItems = [
+    { path: "/admin", label: "Admin Dashboard", icon: "⚙️" },
+    { path: "/admin/payments", label: "Payment Panel", icon: "💳" },
   ];
 
   const isActive = (path: string) => {
@@ -57,6 +74,23 @@ export default function Navigation() {
                       isActive(item.path)
                         ? "bg-fpl-green/20 text-fpl-green shadow-lg"
                         : "text-white hover:bg-white/10 hover:text-fpl-green"
+                    }`}
+                  >
+                    <span>{item.icon}</span>
+                    {item.label}
+                  </Button>
+                </Link>
+              ))}
+              
+              {/* Admin Navigation Items */}
+              {user?.isAdmin && adminNavItems.map((item) => (
+                <Link key={item.path} href={item.path}>
+                  <Button
+                    variant="ghost"
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                      isActive(item.path)
+                        ? "bg-yellow-500/20 text-yellow-400 shadow-lg"
+                        : "text-yellow-300 hover:bg-yellow-500/10 hover:text-yellow-400"
                     }`}
                   >
                     <span>{item.icon}</span>
@@ -146,6 +180,24 @@ export default function Navigation() {
                       isActive(item.path)
                         ? "bg-fpl-green/20 text-fpl-green"
                         : "text-white hover:bg-white/10"
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <span className="mr-2">{item.icon}</span>
+                    {item.label}
+                  </Button>
+                </Link>
+              ))}
+              
+              {/* Admin items in mobile */}
+              {user?.isAdmin && adminNavItems.map((item) => (
+                <Link key={item.path} href={item.path}>
+                  <Button
+                    variant="ghost"
+                    className={`w-full justify-start text-sm font-medium ${
+                      isActive(item.path)
+                        ? "bg-yellow-500/20 text-yellow-400"
+                        : "text-yellow-300 hover:bg-yellow-500/10"
                     }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >

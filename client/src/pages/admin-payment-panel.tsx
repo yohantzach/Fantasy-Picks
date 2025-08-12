@@ -25,8 +25,10 @@ import { format } from "date-fns";
 interface PaymentProof {
   id: number;
   userId: number;
-  username: string;
+  userName: string; // Match server response field name
   email: string;
+  gameweekId: number;
+  teamNumber: number;
   paymentMethod: string;
   transactionId: string;
   amount: string;
@@ -51,7 +53,10 @@ export default function AdminPaymentPanel() {
   // Fetch pending payment proofs
   const { data: pendingProofs, isLoading } = useQuery({
     queryKey: ['admin-pending-payments'],
-    queryFn: () => apiRequest("GET", "/api/payment/admin/pending"),
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/payment/admin/pending");
+      return response.json();
+    },
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
@@ -140,7 +145,7 @@ export default function AdminPaymentPanel() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!pendingProofs || pendingProofs.length === 0 ? (
+                {!pendingProofs || !Array.isArray(pendingProofs) || pendingProofs.length === 0 ? (
                   <div className="text-center py-8">
                     <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
                     <p className="text-white/70">No pending payment verifications</p>
@@ -148,27 +153,28 @@ export default function AdminPaymentPanel() {
                 ) : (
                   <div className="space-y-4 max-h-[600px] overflow-y-auto">
                     {pendingProofs.map((proof: PaymentProof) => (
-                      <div
-                        key={proof.id}
-                        className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                          selectedProof?.id === proof.id
-                            ? 'border-fpl-green bg-fpl-green/10'
-                            : 'border-white/20 bg-white/5 hover:bg-white/10'
-                        }`}
-                        onClick={() => setSelectedProof(proof)}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <User className="h-5 w-5 text-fpl-green" />
-                            <div>
-                              <p className="text-white font-medium">{proof.username || proof.email}</p>
-                              <p className="text-white/60 text-sm">{proof.email}</p>
+                        <div
+                          key={proof.id}
+                          className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                            selectedProof?.id === proof.id
+                              ? 'border-fpl-green bg-fpl-green/10'
+                              : 'border-white/20 bg-white/5 hover:bg-white/10'
+                          }`}
+                          onClick={() => setSelectedProof(proof)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <User className="h-5 w-5 text-fpl-green" />
+                              <div>
+                                <p className="text-white font-medium">{proof.userName || proof.email}</p>
+                                <p className="text-white/60 text-sm">{proof.email}</p>
+                                <p className="text-fpl-green text-xs">GW{proof.gameweekId} Team #{proof.teamNumber}</p>
+                              </div>
                             </div>
+                            <Badge className="bg-orange-500 text-white">
+                              ₹{proof.amount}
+                            </Badge>
                           </div>
-                          <Badge className="bg-orange-500 text-white">
-                            ₹{proof.amount}
-                          </Badge>
-                        </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
@@ -223,7 +229,7 @@ export default function AdminPaymentPanel() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-white/60">Name</p>
-                          <p className="text-white">{selectedProof.username || 'N/A'}</p>
+                          <p className="text-white">{selectedProof.userName || 'N/A'}</p>
                         </div>
                         <div>
                           <p className="text-white/60">Email</p>
@@ -236,6 +242,14 @@ export default function AdminPaymentPanel() {
                         <div>
                           <p className="text-white/60">Submitted</p>
                           <p className="text-white">{format(new Date(selectedProof.submittedAt), 'MMM dd, yyyy HH:mm')}</p>
+                        </div>
+                        <div>
+                          <p className="text-white/60">For Team</p>
+                          <p className="text-white">GW{selectedProof.gameweekId} Team #{selectedProof.teamNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-white/60">Status</p>
+                          <p className="text-orange-400 capitalize">{selectedProof.status}</p>
                         </div>
                       </div>
                     </div>

@@ -410,15 +410,135 @@ app.use(cookieParser());
         return res.status(404).json({ error: "No active gameweek" });
       }
       
-      const team = await storage.getUserTeamForGameweek(req.user!.id, currentGameweek.id);
+      // Get first team for current gameweek (for backward compatibility)
+      const userTeams = await storage.getUserTeamsForGameweek(req.user!.id, currentGameweek.id);
+      const team = userTeams.length > 0 ? userTeams[0] : null;
+      
       if (!team) {
         return res.json(null);
       }
       
+      // Check payment status for this team
+      const paymentStatus = await db
+        .select()
+        .from(paymentProofs)
+        .where(
+          and(
+            eq(paymentProofs.userId, req.user!.id),
+            eq(paymentProofs.gameweekId, currentGameweek.id),
+            eq(paymentProofs.teamNumber, team.teamNumber),
+            eq(paymentProofs.status, 'approved')
+          )
+        )
+        .limit(1);
+      
       const players = await storage.getTeamPlayers(team.id);
-      res.json({ ...team, players });
+      res.json({ 
+        ...team, 
+        players,
+        canEdit: paymentStatus.length > 0 && new Date() <= currentGameweek.deadline,
+        paymentStatus: paymentStatus.length > 0 ? 'approved' : 'pending'
+      });
     } catch (error) {
       console.error("Error fetching user team:", error);
+      res.status(500).json({ error: "Failed to fetch team" });
+    }
+  });
+  
+  // Get all user teams for current gameweek
+  app.get("/api/teams/user", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const currentGameweek = await storage.getCurrentGameweek();
+      if (!currentGameweek) {
+        return res.status(404).json({ error: "No active gameweek" });
+      }
+      
+      const userTeams = await storage.getUserTeamsForGameweek(req.user!.id, currentGameweek.id);
+      
+      // Get payment status for each team
+      const teamsWithPaymentStatus = await Promise.all(
+        userTeams.map(async (team) => {
+          const paymentStatus = await db
+            .select()
+            .from(paymentProofs)
+            .where(
+              and(
+                eq(paymentProofs.userId, req.user!.id),
+                eq(paymentProofs.gameweekId, currentGameweek.id),
+                eq(paymentProofs.teamNumber, team.teamNumber)
+              )
+            )
+            .orderBy(paymentProofs.submittedAt)
+            .limit(1);
+          
+          const payment = paymentStatus[0];
+          return {
+            ...team,
+            paymentStatus: payment?.status || 'not_submitted',
+            canEdit: payment?.status === 'approved' && new Date() <= currentGameweek.deadline,
+            pendingPayment: payment?.status === 'pending'
+          };
+        })
+      );
+      
+      res.json(teamsWithPaymentStatus);
+    } catch (error) {
+      console.error("Error fetching user teams:", error);
+      res.status(500).json({ error: "Failed to fetch teams" });
+    }
+  });
+  
+  // Get specific team by team number
+  app.get("/api/team/:teamNumber", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const teamNumber = parseInt(req.params.teamNumber);
+      const currentGameweek = await storage.getCurrentGameweek();
+      if (!currentGameweek) {
+        return res.status(404).json({ error: "No active gameweek" });
+      }
+      
+      const team = await db
+        .select()
+        .from(teams)
+        .where(
+          and(
+            eq(teams.userId, req.user!.id),
+            eq(teams.gameweekId, currentGameweek.id),
+            eq(teams.teamNumber, teamNumber)
+          )
+        )
+        .limit(1);
+      
+      if (team.length === 0) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      // Check payment status
+      const paymentStatus = await db
+        .select()
+        .from(paymentProofs)
+        .where(
+          and(
+            eq(paymentProofs.userId, req.user!.id),
+            eq(paymentProofs.gameweekId, currentGameweek.id),
+            eq(paymentProofs.teamNumber, teamNumber)
+          )
+        )
+        .limit(1);
+      
+      const players = await storage.getTeamPlayers(team[0].id);
+      res.json({ 
+        ...team[0], 
+        players,
+        canEdit: paymentStatus.length > 0 && paymentStatus[0].status === 'approved' && new Date() <= currentGameweek.deadline,
+        paymentStatus: paymentStatus.length > 0 ? paymentStatus[0].status : 'not_submitted'
+      });
+    } catch (error) {
+      console.error("Error fetching team:", error);
       res.status(500).json({ error: "Failed to fetch team" });
     }
   });
@@ -438,7 +558,9 @@ app.use(cookieParser());
         return res.status(403).json({ error: "Gameweek deadline has passed" });
       }
       
-      const teamData = insertTeamSchema.parse(req.body);
+      // Extract team data and additional fields separately
+      const { teamNumber, ...teamFields } = req.body;
+      const teamData = insertTeamSchema.parse(teamFields);
       
       // Validate team constraints
       if (teamData.players && teamData.players.length !== 11) {
@@ -467,27 +589,128 @@ app.use(cookieParser());
         }
       }
       
-      // Store team data temporarily in session for after payment
+      // Determine team number for this user in this gameweek
+      const existingTeams = await storage.getUserTeamsForGameweek(req.user!.id, currentGameweek.id);
+      const nextTeamNumber = teamNumber || (existingTeams.length + 1);
+      
+      // **CRITICAL: Only allow editing the FIRST approved team**
+      // Get all user's approved payments for this gameweek, ordered by team number
+      const allApprovedPayments = await db
+        .select()
+        .from(paymentProofs)
+        .where(
+          and(
+            eq(paymentProofs.userId, req.user!.id),
+            eq(paymentProofs.gameweekId, currentGameweek.id),
+            eq(paymentProofs.status, 'approved')
+          )
+        )
+        .orderBy(paymentProofs.teamNumber);
+      
+      // Find the first approved team (lowest team number)
+      const firstApprovedPayment = allApprovedPayments[0];
+      
+      // Check if user is trying to edit a specific team number
+      if (teamNumber && firstApprovedPayment) {
+        // If they're trying to edit a team that's NOT their first approved team, deny access
+        if (teamNumber !== firstApprovedPayment.teamNumber) {
+          return res.status(403).json({ 
+            error: "Access denied", 
+            message: `You can only edit your first approved team (Team ${firstApprovedPayment.teamNumber}). Other teams cannot be modified once created.`
+          });
+        }
+      }
+      
+      // Check if user has approved payment for the team they're trying to edit
+      const approvedPayment = firstApprovedPayment && (!teamNumber || teamNumber === firstApprovedPayment.teamNumber) 
+        ? [firstApprovedPayment] : [];
+      
+      if (approvedPayment.length > 0) {
+        // User has approved payment, check if team exists and update it
+        const existingTeam = await db
+          .select()
+          .from(teams)
+          .where(
+            and(
+              eq(teams.userId, req.user!.id),
+              eq(teams.gameweekId, currentGameweek.id),
+              eq(teams.teamNumber, nextTeamNumber)
+            )
+          )
+          .limit(1);
+        
+        let team;
+        if (existingTeam.length > 0) {
+          // Update existing team
+          const [updatedTeam] = await db
+            .update(teams)
+            .set({
+              ...teamData,
+              teamNumber: nextTeamNumber
+            })
+            .where(eq(teams.id, existingTeam[0].id))
+            .returning();
+          team = updatedTeam;
+        } else {
+          // Create new team with approved payment
+          const [newTeam] = await db
+            .insert(teams)
+            .values({
+              ...teamData,
+              userId: req.user!.id,
+              gameweekId: currentGameweek.id,
+              teamNumber: nextTeamNumber,
+              isActive: true
+            })
+            .returning();
+          team = newTeam;
+          
+          // Link payment proof to team
+          await db
+            .update(paymentProofs)
+            .set({ teamId: team.id })
+            .where(eq(paymentProofs.id, approvedPayment[0].id));
+        }
+        
+        return res.json({
+          success: true,
+          team,
+          message: "Team saved successfully!"
+        });
+      }
+      
+      // No approved payment, store team data temporarily and redirect to payment
       req.session.pendingTeam = {
         ...teamData,
-        gameweekId: currentGameweek.id
+        gameweekId: currentGameweek.id,
+        teamNumber: nextTeamNumber
       };
       
       // Redirect to payment flow
       res.json({ 
         success: true,
         requiresPayment: true,
-        redirectTo: "/manual-payment",
+        redirectTo: `/manual-payment?gameweek=${currentGameweek.id}&team=${nextTeamNumber}`,
         message: "Team validated successfully. Please complete payment to register your team.",
         gameweekId: currentGameweek.id,
+        teamNumber: nextTeamNumber,
         amount: 20
       });
     } catch (error) {
       console.error("Error validating team:", error);
+      console.error("Request body:", req.body);
+      console.error("Stack trace:", error instanceof Error ? error.stack : 'No stack trace');
+      
       if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", error.errors);
         return res.status(400).json({ error: "Invalid team data", details: error.errors });
       }
-      res.status(500).json({ error: "Failed to validate team" });
+      
+      res.status(500).json({ 
+        error: "Failed to validate team",
+        message: error instanceof Error ? error.message : 'Unknown error',
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : error) : undefined
+      });
     }
   });
 

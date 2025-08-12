@@ -2,7 +2,6 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
-import { authMiddleware } from "../middleware/auth";
 import { db } from "../../db";
 import { and, eq } from "drizzle-orm";
 import { users, paymentProofs } from "@shared/schema";
@@ -23,7 +22,8 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, `payment-proof-${req.user.id}-${uniqueSuffix}${ext}`);
+    const userId = (req as any).user?.id || 'unknown';
+    cb(null, `payment-proof-${userId}-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -33,6 +33,12 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
+    // Only validate file type if a file is actually being uploaded
+    if (!file) {
+      cb(null, true);
+      return;
+    }
+    
     const allowedTypes = [
       'image/jpeg',
       'image/jpg',
@@ -51,20 +57,71 @@ const upload = multer({
 });
 
 // Submit payment proof
-router.post("/submit-proof", authMiddleware, upload.single('proofFile'), async (req, res) => {
+router.post("/submit-proof", upload.single('proofFile'), async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   try {
-    const { paymentMethod, transactionId, amount, notes, gameweekId, teamNumber } = req.body;
+    
+    // Extract form data from multer-processed request
+    const {
+      paymentMethod,
+      transactionId,
+      amount,
+      notes,
+      gameweekId,
+      teamNumber,
+      teamName,
+      formation,
+      players,
+      captainId,
+      viceCaptainId
+    } = req.body;
+    
     const userId = req.user.id;
 
+    // MANUAL EXTRACTION AS BACKUP
+    const manualExtraction = {
+      paymentMethod: req.body.paymentMethod || req.body['paymentMethod'],
+      transactionId: req.body.transactionId || req.body['transactionId'],
+      gameweekId: req.body.gameweekId || req.body['gameweekId'],
+      teamNumber: req.body.teamNumber || req.body['teamNumber']
+    };
+    
+    console.log('Manual extraction:', manualExtraction);
+
+    // Try manual extraction if destructuring failed
+    const finalPaymentMethod = paymentMethod || manualExtraction.paymentMethod;
+    const finalTransactionId = transactionId || manualExtraction.transactionId;
+    const finalGameweekId = gameweekId || manualExtraction.gameweekId;
+    const finalTeamNumber = teamNumber || manualExtraction.teamNumber;
+    
+    console.log('Final values:');
+    console.log('- paymentMethod:', finalPaymentMethod);
+    console.log('- transactionId:', finalTransactionId);
+    console.log('- gameweekId:', finalGameweekId);
+    console.log('- teamNumber:', finalTeamNumber);
+
     // Validate required fields
-    if (!paymentMethod || !transactionId || !gameweekId || !teamNumber) {
+    if (!finalPaymentMethod || !finalTransactionId || !finalGameweekId || !finalTeamNumber) {
       return res.status(400).json({
-        error: "Payment method, transaction ID, gameweek ID, and team number are required"
+        error: "Payment method, transaction ID, gameweek ID, and team number are required",
+        debug: {
+          received: req.body,
+          extracted: {
+            paymentMethod: !!finalPaymentMethod,
+            transactionId: !!finalTransactionId,
+            gameweekId: !!finalGameweekId,
+            teamNumber: !!finalTeamNumber
+          }
+        }
       });
     }
+    
+    // Use final values for the rest of the processing
+    const currentGameweekId = parseInt(finalGameweekId);
+    const currentTeamNumber = parseInt(finalTeamNumber);
 
-    const currentGameweekId = parseInt(gameweekId);
-    const currentTeamNumber = parseInt(teamNumber);
 
     // Check if user already has a pending or approved payment for this team in this gameweek
     const existingProof = await db
@@ -111,8 +168,8 @@ router.post("/submit-proof", authMiddleware, upload.single('proofFile'), async (
       userId,
       gameweekId: currentGameweekId,
       teamNumber: currentTeamNumber,
-      paymentMethod,
-      transactionId,
+      paymentMethod: finalPaymentMethod,
+      transactionId: finalTransactionId,
       amount: parseFloat(amount) || 20,
       notes: notes || null,
       proofFilePath: req.file ? req.file.path : null,
@@ -125,10 +182,38 @@ router.post("/submit-proof", authMiddleware, upload.single('proofFile'), async (
       .values(proofData)
       .returning();
 
+    // Store team data in session for later use when payment is approved
+    if (teamName && formation && players && captainId && viceCaptainId) {
+      try {
+        req.session.pendingTeam = {
+          teamName,
+          formation,
+          players: JSON.parse(players),
+          captainId: parseInt(captainId),
+          viceCaptainId: parseInt(viceCaptainId),
+          gameweekId: currentGameweekId,
+          teamNumber: currentTeamNumber,
+          paymentProofId: newProof.id
+        };
+        
+        console.log(`Team data stored in session for user ${userId}, team ${currentTeamNumber}:`, {
+          teamName,
+          formation,
+          playersCount: JSON.parse(players).length,
+          captainId,
+          viceCaptainId
+        });
+      } catch (parseError) {
+        console.error("Error parsing team data:", parseError);
+        // Continue without storing team data - user can reselect team later
+      }
+    }
+
     res.json({
       message: "Payment proof submitted successfully",
       proofId: newProof.id,
-      status: "pending"
+      status: "pending",
+      teamDataStored: !!(teamName && formation && players)
     });
 
   } catch (error) {
@@ -150,7 +235,10 @@ router.post("/submit-proof", authMiddleware, upload.single('proofFile'), async (
 });
 
 // Get payment status for current user for a specific team
-router.get("/status/:gameweekId/:teamNumber", authMiddleware, async (req, res) => {
+router.get("/status/:gameweekId/:teamNumber", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   try {
     const userId = req.user.id;
     const gameweekId = parseInt(req.params.gameweekId);
@@ -267,7 +355,10 @@ router.get("/status/:gameweekId/:teamNumber", authMiddleware, async (req, res) =
 });
 
 // Get payment status for current user (legacy endpoint)
-router.get("/status", authMiddleware, async (req, res) => {
+router.get("/status", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   try {
     const userId = req.user.id;
 
@@ -321,10 +412,13 @@ router.get("/status", authMiddleware, async (req, res) => {
 });
 
 // Admin endpoint to list pending payment proofs
-router.get("/admin/pending", authMiddleware, async (req, res) => {
+router.get("/admin/pending", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   try {
     // Check if user is admin
-    if (req.user.role !== 'admin') {
+    if (!req.user!.isAdmin) {
       return res.status(403).json({
         error: "Admin access required"
       });
@@ -334,8 +428,10 @@ router.get("/admin/pending", authMiddleware, async (req, res) => {
       .select({
         id: paymentProofs.id,
         userId: paymentProofs.userId,
-        username: users.username,
+        userName: users.name,
         email: users.email,
+        gameweekId: paymentProofs.gameweekId,
+        teamNumber: paymentProofs.teamNumber,
         paymentMethod: paymentProofs.paymentMethod,
         transactionId: paymentProofs.transactionId,
         amount: paymentProofs.amount,
@@ -360,10 +456,13 @@ router.get("/admin/pending", authMiddleware, async (req, res) => {
 });
 
 // Admin endpoint to approve/reject payment proof
-router.post("/admin/verify/:proofId", authMiddleware, async (req, res) => {
+router.post("/admin/verify/:proofId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   try {
     // Check if user is admin
-    if (req.user.role !== 'admin') {
+    if (!req.user!.isAdmin) {
       return res.status(403).json({
         error: "Admin access required"
       });
@@ -412,21 +511,23 @@ router.post("/admin/verify/:proofId", authMiddleware, async (req, res) => {
       })
       .where(eq(paymentProofs.id, parseInt(proofId)));
 
-    // If approved, update user's payment status and complete team registration
+    // If approved, complete team creation process
     if (action === 'approve') {
       await db
         .update(users)
         .set({ hasPaid: true })
         .where(eq(users.id, paymentProof.userId));
       
-      // Trigger team registration completion if team data is available in session
-      // This would need to be handled by the admin notification system
       console.log(`Payment approved for user ${paymentProof.userId}, team number ${paymentProof.teamNumber}`);
+      
+      // Note: Team will be created when user next saves their team selection
+      // The /api/team/save endpoint now checks for approved payments and creates teams automatically
     }
 
     res.json({
       message: `Payment proof ${action}d successfully`,
-      status: newStatus
+      status: newStatus,
+      teamCreationNote: action === 'approve' ? 'Team will be created when user updates their selection' : null
     });
 
   } catch (error) {
@@ -438,10 +539,13 @@ router.post("/admin/verify/:proofId", authMiddleware, async (req, res) => {
 });
 
 // Serve uploaded payment proof files (admin only)
-router.get("/admin/file/:proofId", authMiddleware, async (req, res) => {
+router.get("/admin/file/:proofId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   try {
     // Check if user is admin
-    if (req.user.role !== 'admin') {
+    if (!req.user!.isAdmin) {
       return res.status(403).json({
         error: "Admin access required"
       });

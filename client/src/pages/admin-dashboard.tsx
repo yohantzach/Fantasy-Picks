@@ -72,7 +72,8 @@ export default function AdminDashboard() {
         ? (currentGameweek as any)?.id 
         : selectedGameweek;
       const response = await apiRequest("GET", `/api/admin/teams?gameweek=${gameweekParam}`);
-      return response;
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!currentGameweek,
   });
@@ -81,7 +82,9 @@ export default function AdminDashboard() {
   const { data: allUsers = [], isLoading: usersLoading } = useQuery({
     queryKey: ["/api/admin/users"],
     queryFn: async () => {
-      return apiRequest("GET", "/api/admin/users");
+      const response = await apiRequest("GET", "/api/admin/users");
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     }
   });
 
@@ -355,7 +358,7 @@ export default function AdminDashboard() {
                         <div className="text-white/60 text-xs">{team.userEmail}</div>
                       </td>
                       <td className="py-3 px-4 text-white">{team.formation}</td>
-                      <td className="py-3 px-4 text-white">£{team.totalValue?.toFixed(1)}m</td>
+                      <td className="py-3 px-4 text-white">£{(team.totalValue && typeof team.totalValue === 'number') ? team.totalValue.toFixed(1) : '0.0'}m</td>
                       <td className="py-3 px-4 text-white">{team.totalPoints}</td>
                       <td className="py-3 px-4">
                         <Badge className={team.players.length === 11 ? "bg-green-600" : "bg-red-600"}>
@@ -411,7 +414,7 @@ export default function AdminDashboard() {
                       <div><span className="text-white/70">Owner:</span> {selectedTeam.userName}</div>
                       <div><span className="text-white/70">Email:</span> {selectedTeam.userEmail}</div>
                       <div><span className="text-white/70">Formation:</span> {selectedTeam.formation}</div>
-                      <div><span className="text-white/70">Total Value:</span> £{selectedTeam.totalValue?.toFixed(1)}m</div>
+                      <div><span className="text-white/70">Total Value:</span> £{(selectedTeam.totalValue && typeof selectedTeam.totalValue === 'number') ? selectedTeam.totalValue.toFixed(1) : '0.0'}m</div>
                       <div><span className="text-white/70">Total Points:</span> {selectedTeam.totalPoints}</div>
                       <div><span className="text-white/70">Status:</span> {selectedTeam.isLocked ? 'Locked' : 'Active'}</div>
                     </div>

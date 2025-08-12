@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,9 +30,25 @@ export default function EditTeam() {
     queryKey: ["/api/gameweek/current"],
   });
 
-  // Fetch user's current team
-  const { data: currentTeam } = useQuery({
-    queryKey: ["/api/team/current"],
+  // Get team number from URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const teamNumberFromUrl = urlParams.get('team');
+  const teamNumber = teamNumberFromUrl ? parseInt(teamNumberFromUrl) : 1;
+  
+  // Fetch user's teams to determine which team can be edited
+  const { data: userTeams = [], isLoading: teamsLoading } = useQuery({
+    queryKey: ["/api/teams/user"],
+  });
+  
+  // Find the first team with approved payment (this is the only editable team)
+  const editableTeam = userTeams.find(team => team.paymentStatus === 'approved');
+  const requestedTeamNumber = teamNumberFromUrl ? parseInt(teamNumberFromUrl) : (editableTeam?.teamNumber || 1);
+  
+  // Fetch specific team only if it matches the editable team number
+  const { data: currentTeam, isLoading: teamLoading } = useQuery({
+    queryKey: ["/api/team", requestedTeamNumber],
+    queryFn: () => apiRequest("GET", `/api/team/${requestedTeamNumber}`),
+    enabled: !!editableTeam && requestedTeamNumber === editableTeam.teamNumber,
   });
 
   // Fetch FPL data
@@ -179,6 +195,8 @@ export default function EditTeam() {
         description: "Your team changes have been saved successfully!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teams/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/team", requestedTeamNumber] });
       setIsModified(false);
     },
     onError: (error: any) => {
@@ -224,13 +242,35 @@ export default function EditTeam() {
       players: selectedPlayers,
       captainId,
       viceCaptainId,
+      teamNumber: currentTeam?.teamNumber || requestedTeamNumber,
     };
 
     saveTeamMutation.mutate(teamData);
   };
 
   const isDeadlinePassed = currentGameweek?.deadline ? new Date() > new Date(currentGameweek.deadline) : false;
-  const isLocked = currentTeam?.isLocked || isDeadlinePassed;
+  const canEdit = currentTeam?.canEdit;
+  const paymentStatus = currentTeam?.paymentStatus;
+  const isLocked = currentTeam?.isLocked || isDeadlinePassed || !canEdit;
+  
+  // Check if user has access to edit teams (payment must be approved AND it's the first approved team)
+  const hasEditAccess = editableTeam && currentTeam && 
+    editableTeam.teamNumber === currentTeam.teamNumber && 
+    editableTeam.paymentStatus === 'approved';
+  const teamExists = currentTeam && currentTeam.players && currentTeam.players.length > 0;
+  
+  // Check if user is trying to edit a team they don't have access to
+  const isAccessDenied = teamNumberFromUrl && 
+    (!editableTeam || parseInt(teamNumberFromUrl) !== editableTeam.teamNumber);
+  
+  // Redirect to the correct editable team if user tries to access wrong team
+  React.useEffect(() => {
+    if (isAccessDenied && editableTeam && !teamsLoading) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('team', editableTeam.teamNumber.toString());
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+  }, [isAccessDenied, editableTeam, teamsLoading]);
   
   // Show gameweek status
   const getGameweekStatus = () => {
@@ -323,8 +363,77 @@ export default function EditTeam() {
           </Card>
         </div>
 
+        {/* Payment Status Warning */}
+        {paymentStatus && paymentStatus !== 'approved' && (
+          <Card className="border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <span className="font-medium">
+                  {paymentStatus === 'pending' && "Payment Pending - Editing Restricted"}
+                  {paymentStatus === 'rejected' && "Payment Rejected - Please Pay Again"}
+                  {paymentStatus === 'not_submitted' && "Payment Required - Please Complete Payment"}
+                </span>
+              </div>
+              {paymentStatus === 'pending' && (
+                <p className="text-sm text-orange-700 dark:text-orange-300 mt-2">
+                  Your team will be editable once payment is approved by admin.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Access Denied Message */}
+        {(!hasEditAccess && !teamLoading && !teamsLoading) && (
+          <Card className="border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                {editableTeam ? "Team Access Restricted" : "Payment Required to Edit Teams"}
+              </h3>
+              <p className="text-blue-700 dark:text-blue-300 mb-4">
+                {editableTeam ? (
+                  <>You can only edit your first approved team (Team {editableTeam.teamNumber}). Other teams cannot be edited once created and paid for.</>
+                ) : (
+                  <>You can only edit teams after your payment has been verified and approved by admin. 
+                  {userTeams.length === 0 && "Please create and pay for a team first."}
+                  {userTeams.length > 0 && userTeams[0]?.paymentStatus === 'pending' && "Your payment is currently being reviewed."}
+                  {userTeams.length > 0 && userTeams[0]?.paymentStatus === 'rejected' && "Your payment was rejected. Please resubmit payment."}
+                  {userTeams.length > 0 && userTeams[0]?.paymentStatus === 'not_submitted' && "Please complete payment for your team."}
+                  </>
+                )}
+              </p>
+              <div className="flex gap-2 justify-center">
+                {editableTeam ? (
+                  <Link href={`/edit-team?team=${editableTeam.teamNumber}`}>
+                    <Button className="bg-fpl-green hover:bg-green-600">
+                      Edit Team {editableTeam.teamNumber}
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/">
+                      <Button className="bg-fpl-green hover:bg-green-600">
+                        Create New Team
+                      </Button>
+                    </Link>
+                    {userTeams.length > 0 && userTeams[0]?.paymentStatus !== 'approved' && userTeams[0]?.paymentStatus !== 'pending' && (
+                      <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${userTeams[0]?.teamNumber || 1}`}>
+                        <Button variant="outline">
+                          Complete Payment
+                        </Button>
+                      </Link>
+                    )}
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Deadline warning */}
-        {currentGameweek?.deadline && (
+        {hasEditAccess && currentGameweek?.deadline && (
           <Card className={`border-l-4 ${
             isDeadlinePassed ? 'border-l-red-500 bg-red-50 dark:bg-red-950/20' : 
             'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950/20'
@@ -343,7 +452,7 @@ export default function EditTeam() {
           </Card>
         )}
 
-        {!showPlayerTable ? (
+        {hasEditAccess && currentTeam && !showPlayerTable ? (
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Formation Pitch */}
             <div className="lg:col-span-2">

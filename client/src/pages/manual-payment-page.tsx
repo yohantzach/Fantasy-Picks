@@ -31,20 +31,33 @@ export default function ManualPaymentPage() {
   const [notes, setNotes] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
 
-  // Get URL parameters for gameweek and team number
+  // Get URL parameters for gameweek, team number and team data
   const urlParams = new URLSearchParams(window.location.search);
   const gameweekFromUrl = urlParams.get('gameweek');
   const teamFromUrl = urlParams.get('team');
+  const teamNameFromUrl = urlParams.get('teamName');
+  const formationFromUrl = urlParams.get('formation');
+  const playersFromUrl = urlParams.get('players');
+  const captainIdFromUrl = urlParams.get('captainId');
+  const viceCaptainIdFromUrl = urlParams.get('viceCaptainId');
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
-    queryKey: ['current-gameweek'],
-    queryFn: () => apiRequest("GET", "/api/gameweek/current"),
+    queryKey: ["/api/gameweek/current"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/gameweek/current");
+      return response.json();
+    },
   });
 
   // Determine which gameweek and team we're paying for
-  const paymentGameweekId = gameweekFromUrl ? parseInt(gameweekFromUrl) : currentGameweek?.id;
+  // Ensure we have valid numbers, fallback to defaults if needed
+  const paymentGameweekId = gameweekFromUrl ? parseInt(gameweekFromUrl) : (currentGameweek?.id || 1);
   const paymentTeamNumber = teamFromUrl ? parseInt(teamFromUrl) : 1;
+  
+  // Additional validation to ensure we have valid numbers
+  const validGameweekId = !isNaN(paymentGameweekId) ? paymentGameweekId : (currentGameweek?.id || 1);
+  const validTeamNumber = !isNaN(paymentTeamNumber) ? paymentTeamNumber : 1;
 
   // Redirect if not logged in
   if (!user) {
@@ -58,7 +71,19 @@ export default function ManualPaymentPage() {
 
   const submitPaymentProof = useMutation({
     mutationFn: async (data: FormData) => {
-      return apiRequest("POST", "/api/payment/submit-proof", data);
+      // Use raw fetch for FormData instead of apiRequest
+      const res = await fetch("/api/payment/submit-proof", {
+        method: "POST",
+        body: data, // Don't set Content-Type, let browser set it for FormData
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      
+      return res;
     },
     onSuccess: () => {
       toast({
@@ -90,7 +115,7 @@ export default function ManualPaymentPage() {
       return;
     }
 
-    if (!paymentGameweekId) {
+    if (!validGameweekId) {
       toast({
         title: "Error",
         description: "Unable to determine gameweek for payment",
@@ -104,8 +129,25 @@ export default function ManualPaymentPage() {
     formData.append("transactionId", transactionId);
     formData.append("amount", amount);
     formData.append("notes", notes);
-    formData.append("gameweekId", paymentGameweekId.toString());
-    formData.append("teamNumber", paymentTeamNumber.toString());
+    formData.append("gameweekId", validGameweekId.toString());
+    formData.append("teamNumber", validTeamNumber.toString());
+    
+    // Include team data if available from URL
+    if (teamNameFromUrl) {
+      formData.append("teamName", teamNameFromUrl);
+    }
+    if (formationFromUrl) {
+      formData.append("formation", formationFromUrl);
+    }
+    if (playersFromUrl) {
+      formData.append("players", playersFromUrl);
+    }
+    if (captainIdFromUrl) {
+      formData.append("captainId", captainIdFromUrl);
+    }
+    if (viceCaptainIdFromUrl) {
+      formData.append("viceCaptainId", viceCaptainIdFromUrl);
+    }
     
     if (proofFile) {
       formData.append("proofFile", proofFile);
@@ -143,13 +185,18 @@ export default function ManualPaymentPage() {
               Complete Payment
             </h1>
             <p className="text-white/70 text-lg">
-              Pay ₹20 for Team {paymentTeamNumber} in this gameweek's competition
+              Pay ₹20 for Team {validTeamNumber} in this gameweek's competition
             </p>
             {teamFromUrl && (
               <div className="mt-4 p-3 bg-fpl-green/20 border border-fpl-green/30 rounded-lg inline-block">
                 <p className="text-fpl-green text-sm font-medium">
-                  🏆 Payment for Team #{paymentTeamNumber} 
+                  🏆 Payment for Team #{validTeamNumber} {teamNameFromUrl ? `"${teamNameFromUrl}"` : ''}
                 </p>
+                {playersFromUrl && (
+                  <p className="text-fpl-green/80 text-xs mt-1">
+                    Team ready to register after payment approval
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -300,6 +347,7 @@ export default function ManualPaymentPage() {
                     />
                   </div>
 
+                  
                   <Button
                     type="submit"
                     disabled={submitPaymentProof.isPending || !paymentMethod || !transactionId}

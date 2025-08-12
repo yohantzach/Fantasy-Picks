@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Save, Users, DollarSign, Trophy, AlertCircle } from "lucide-react";
+import { Clock, Save, Users, DollarSign, Trophy, AlertCircle, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { FormationPitch } from "@/components/formation-pitch";
 import { EnhancedPlayerSelectionTable } from "@/components/enhanced-player-selection-table";
@@ -163,7 +163,7 @@ export default function TeamSelection() {
           title: "Team Validated! 🎉",
           description: "Redirecting to payment to complete your team registration...",
         });
-        // Redirect to payment page with UPI details
+        // Redirect to payment page with UPI details and team number
         window.location.href = data.redirectTo;
       } else {
         toast({
@@ -171,6 +171,7 @@ export default function TeamSelection() {
           description: "Your team has been registered and is ready for scoring!",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/teams/user"] });
       }
     },
     onError: (error: any) => {
@@ -182,7 +183,74 @@ export default function TeamSelection() {
     },
   });
 
+  const handlePayNow = () => {
+    if (selectedPlayers.length !== 11) {
+      toast({
+        title: "Incomplete Team",
+        description: "You must select exactly 11 players",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!captainId || !viceCaptainId) {
+      toast({
+        title: "Missing Captain",
+        description: "You must select a captain and vice-captain",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!teamName.trim()) {
+      toast({
+        title: "Team Name Required",
+        description: "Please enter a team name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // For new teams, redirect directly to payment
+    if (!currentTeam || currentTeam.paymentStatus !== 'approved') {
+      // Store team data in session and redirect to payment
+      const existingTeams = currentGameweek ? [] : []; // Will be calculated server-side
+      const nextTeamNumber = currentTeam?.teamNumber || 1;
+      
+      toast({
+        title: "Team Validated! 🎉",
+        description: "Redirecting to payment to complete your team registration...",
+      });
+      
+      // Redirect to payment page with team data
+      const params = new URLSearchParams({
+        gameweek: currentGameweek?.id.toString() || '1',
+        team: nextTeamNumber.toString(),
+        teamName: teamName.trim(),
+        formation: "4-4-2",
+        players: JSON.stringify(selectedPlayers),
+        captainId: captainId?.toString() || '',
+        viceCaptainId: viceCaptainId?.toString() || ''
+      });
+      
+      window.location.href = `/manual-payment?${params.toString()}`;
+      return;
+    }
+
+    // For existing paid teams, save normally
+    const teamData = {
+      teamName: teamName.trim(),
+      formation: "4-4-2",
+      players: selectedPlayers,
+      captainId,
+      viceCaptainId,
+    };
+
+    saveTeamMutation.mutate(teamData);
+  };
+
   const handleSaveTeam = () => {
+    // This is only for editing existing paid teams
     if (selectedPlayers.length !== 11) {
       toast({
         title: "Incomplete Team",
@@ -233,7 +301,7 @@ export default function TeamSelection() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Team Selection</h1>
+          <h1 className="text-3xl font-bold gradient-text">Create Team</h1>
           <p className="text-muted-foreground">
             {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber}` : "Loading..."}
           </p>
@@ -397,23 +465,45 @@ export default function TeamSelection() {
                 </div>
 
                 {!isLocked && (
-                  <Button
-                    onClick={handleSaveTeam}
-                    className="w-full"
-                    disabled={saveTeamMutation.isPending || selectedPlayers.length !== 11}
-                  >
-                    {saveTeamMutation.isPending ? (
-                      <>
-                        <Save className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
+                  <>  
+                    {/* Show Pay Now for new teams or teams without approved payment */}
+                    {(!currentTeam || currentTeam.paymentStatus !== 'approved') ? (
+                      <Button
+                        onClick={handlePayNow}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        disabled={selectedPlayers.length !== 11 || !captainId || !viceCaptainId || !teamName.trim()}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Pay Now (₹20)
+                      </Button>
                     ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Team
-                      </>
+                      /* Show Save Team only for existing paid teams */
+                      <Button
+                        onClick={handleSaveTeam}
+                        className="w-full"
+                        disabled={saveTeamMutation.isPending || selectedPlayers.length !== 11}
+                      >
+                        {saveTeamMutation.isPending ? (
+                          <>
+                            <Save className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Team
+                          </>
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                    
+                    {/* Show payment status for context */}
+                    {currentTeam?.paymentStatus && currentTeam.paymentStatus !== 'approved' && (
+                      <div className="text-center text-sm text-yellow-600 mt-2">
+                        Payment Status: {currentTeam.paymentStatus === 'pending' ? 'Pending Admin Approval' : 'Payment Required'}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {isLocked && (
