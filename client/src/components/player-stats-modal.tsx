@@ -175,9 +175,9 @@ export function PlayerStatsModal({
             <Card className="bg-white/10 border-white/20">
               <CardContent className="p-3 text-center">
                 <div className="text-xl font-bold text-white">
-                  {player.selected_by_percent || "0"}%
+                  {player.ict_index || "0.0"}
                 </div>
-                <div className="text-xs text-gray-300">Selected By</div>
+                <div className="text-xs text-gray-300">ICT Index</div>
               </CardContent>
             </Card>
           </div>

@@ -26,7 +26,49 @@ export default function TeamSelection() {
   const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
   const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<any>(null);
   const [showPlayerTable, setShowPlayerTable] = useState<number | null>(null);
+  const [replacingPlayer, setReplacingPlayer] = useState<number | null>(null);
   const [formation, setFormation] = useState("4-4-2");
+
+  // Handle formation changes with validation
+  const handleFormationChange = (newFormation: string) => {
+    const newLimits = getFormationLimits(newFormation);
+    const currentLimits = getFormationLimits(formation);
+    
+    // Check if current team violates new formation constraints
+    let needsAdjustment = false;
+    const violations: string[] = [];
+    
+    for (const elementType of [2, 3, 4]) { // Check DEF, MID, FWD
+      const currentCount = selectedPlayers.filter(id => {
+        const p = players.find(p => p.id === id);
+        return p?.element_type === elementType;
+      }).length;
+      
+      const newLimit = newLimits[elementType as keyof typeof newLimits];
+      const positionName = elementType === 2 ? "defenders" : elementType === 3 ? "midfielders" : "forwards";
+      
+      if (currentCount > newLimit) {
+        needsAdjustment = true;
+        violations.push(`${currentCount} ${positionName} (max: ${newLimit})`);
+      }
+    }
+    
+    if (needsAdjustment) {
+      toast({
+        title: "Formation Change Blocked",
+        description: `Current team has: ${violations.join(", ")}. Please remove excess players first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setFormation(newFormation);
+    
+    toast({
+      title: "Formation Updated",
+      description: `Changed to ${newFormation} formation`,
+    });
+  };
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
@@ -67,19 +109,32 @@ export default function TeamSelection() {
 
   const totalCost = useMemo(() => {
     const selectedPlayerObjs = players.filter(p => selectedPlayers.includes(p.id));
-    return selectedPlayerObjs.reduce((sum, p) => sum + p.now_cost, 0);
+    return selectedPlayerObjs.reduce((sum, p) => sum + (p.now_cost + 10), 0); // Add 1M (10 units) to each player
   }, [selectedPlayers, players]);
 
-  const remainingBudget = 1000 - totalCost; // 100.0m in API units
+  const remainingBudget = 1000 - totalCost; // 100.0m total budget
+
+  // Get formation-based position limits
+  const getFormationLimits = (formation: string) => {
+    const [def, mid, fwd] = formation.split('-').map(Number);
+    return {
+      1: 1,   // Always 1 GK
+      2: def, // Defenders
+      3: mid, // Midfielders  
+      4: fwd  // Forwards
+    };
+  };
+
+  const formationLimits = getFormationLimits(formation);
 
   // Validate team constraints
-  const validatePlayerSelection = (playerId: number, isAdding: boolean) => {
+  const validatePlayerSelection = (playerId: number, isAdding: boolean, skipPositionCheck = false) => {
     const player = players.find(p => p.id === playerId);
     if (!player) return false;
 
     if (isAdding) {
-      // Check if already at 11 players
-      if (selectedPlayers.length >= 11) {
+      // Check if already at 11 players (unless we're replacing)
+      if (selectedPlayers.length >= 11 && !skipPositionCheck) {
         toast({
           title: "Team Full",
           description: "You can only select 11 players",
@@ -88,34 +143,36 @@ export default function TeamSelection() {
         return false;
       }
 
-      // Check budget
-      if (player.now_cost > remainingBudget) {
+      // Check budget (add 1M inflation to player cost for validation)
+      if ((player.now_cost + 10) > remainingBudget) {
         toast({
           title: "Insufficient Budget",
-          description: `You need £${((player.now_cost - remainingBudget) / 10).toFixed(1)}m more`,
+          description: `You need £${(((player.now_cost + 10) - remainingBudget) / 10).toFixed(1)}m more`,
           variant: "destructive",
         });
         return false;
       }
 
-      // Check position limits
-      const currentPositionCount = selectedPlayers.filter(id => {
-        const p = players.find(p => p.id === id);
-        return p?.element_type === player.element_type;
-      }).length;
+      // Check formation-based position limits
+      if (!skipPositionCheck) {
+        const currentPositionCount = selectedPlayers.filter(id => {
+          const p = players.find(p => p.id === id);
+          return p?.element_type === player.element_type;
+        }).length;
 
-      const maxForPosition = player.element_type === 1 ? 2 : player.element_type === 2 ? 5 : player.element_type === 3 ? 5 : 3;
-      
-      if (currentPositionCount >= maxForPosition) {
-        const positionName = player.element_type === 1 ? "goalkeepers" : 
-                           player.element_type === 2 ? "defenders" :
-                           player.element_type === 3 ? "midfielders" : "forwards";
-        toast({
-          title: "Position Limit Reached",
-          description: `You can only select ${maxForPosition} ${positionName}`,
-          variant: "destructive",
-        });
-        return false;
+        const maxForPosition = formationLimits[player.element_type as keyof typeof formationLimits] || 0;
+        
+        if (currentPositionCount >= maxForPosition) {
+          const positionName = player.element_type === 1 ? "goalkeepers" : 
+                             player.element_type === 2 ? "defenders" :
+                             player.element_type === 3 ? "midfielders" : "forwards";
+          toast({
+            title: "Position Limit Reached",
+            description: `You can only select ${maxForPosition} ${positionName} in ${formation} formation`,
+            variant: "destructive",
+          });
+          return false;
+        }
       }
 
       // Check team limit (max 3 from same team)
@@ -138,13 +195,45 @@ export default function TeamSelection() {
   };
 
   const handlePlayerToggle = (playerId: number, isAdding: boolean) => {
-    if (!validatePlayerSelection(playerId, isAdding)) return;
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
 
     if (isAdding) {
-      setSelectedPlayers(prev => [...prev, playerId]);
+      // Check current position count and formation limits
+      const currentPositionPlayers = selectedPlayers.filter(id => {
+        const p = players.find(p => p.id === id);
+        return p?.element_type === player.element_type;
+      });
+      const maxForPosition = formationLimits[player.element_type as keyof typeof formationLimits] || 0;
+      
+      // If position is full, replace the first player in that position
+      if (currentPositionPlayers.length >= maxForPosition) {
+        // Validate replacement (skip position check since we're replacing)
+        if (!validatePlayerSelection(playerId, isAdding, true)) return;
+        
+        const playerToReplace = currentPositionPlayers[0];
+        setSelectedPlayers(prev => {
+          const updated = prev.filter(id => id !== playerToReplace);
+          return [...updated, playerId];
+        });
+        // Remove captain/vice-captain if replacing
+        if (captainId === playerToReplace) setCaptainId(null);
+        if (viceCaptainId === playerToReplace) setViceCaptainId(null);
+        
+        toast({
+          title: "Player Replaced",
+          description: `${players.find(p => p.id === playerToReplace)?.web_name} replaced with ${player.web_name}`,
+        });
+      } else {
+        // Normal validation for adding new player
+        if (!validatePlayerSelection(playerId, isAdding)) return;
+        setSelectedPlayers(prev => [...prev, playerId]);
+      }
+      
       // Close the player table after adding a player
       setShowPlayerTable(null);
     } else {
+      // Removing a player
       setSelectedPlayers(prev => prev.filter(id => id !== playerId));
       // Remove captain/vice-captain if deselected
       if (captainId === playerId) setCaptainId(null);
@@ -340,7 +429,7 @@ export default function TeamSelection() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Formation - Click on positions to select players</CardTitle>
                   <div className="w-32">
-                    <Select value={formation} onValueChange={setFormation} disabled={isLocked}>
+                    <Select value={formation} onValueChange={handleFormationChange} disabled={isLocked}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -396,7 +485,7 @@ export default function TeamSelection() {
                         <div key={playerId} className="flex justify-between items-center text-sm">
                           <span>{player.web_name}</span>
                           <div className="flex items-center gap-2">
-                            <span>£{(player.now_cost / 10).toFixed(1)}m</span>
+                            <span>£{((player.now_cost + 10) / 10).toFixed(1)}m</span>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -542,8 +631,8 @@ export default function TeamSelection() {
           onMakeViceCaptain={() => console.log('Make vice captain')}
           onRemoveCaptain={() => console.log('Remove captain')}
           onRemoveViceCaptain={() => console.log('Remove vice captain')}
-          showCaptainOption={true}
-          showViceCaptainOption={true}
+          showCaptainOption={false}
+          showViceCaptainOption={false}
           isCaptain={captainId === selectedPlayerForStats?.id}
           isViceCaptain={viceCaptainId === selectedPlayerForStats?.id}
         />

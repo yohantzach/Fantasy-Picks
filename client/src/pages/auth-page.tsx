@@ -306,7 +306,7 @@ export default function AuthPage() {
             </p>
             <p className="text-lg flex items-center justify-center gap-2">
               <Target className="h-5 w-5 text-fpl-green" />
-              Compete for weekly prizes
+              Win exciting rewards weekly
             </p>
             <p className="text-lg flex items-center justify-center gap-2">
               <Zap className="h-5 w-5 text-fpl-green" />

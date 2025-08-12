@@ -16,6 +16,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import ProfilePage from "@/pages/profile-page";
 import ManualPaymentPage from "@/pages/manual-payment-page";
 import AdminPaymentPanel from "@/pages/admin-payment-panel";
+import RulesPage from "@/pages/rules-page";
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       <ProtectedRoute path="/teams" component={Teams} />
       <ProtectedRoute path="/leaderboard" component={Leaderboard} />
       <ProtectedRoute path="/fixtures" component={Fixtures} />
+      <ProtectedRoute path="/rules" component={RulesPage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/admin" component={AdminDashboard} adminOnly />
       <ProtectedRoute path="/admin/payments" component={AdminPaymentPanel} adminOnly />

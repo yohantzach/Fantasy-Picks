@@ -296,7 +296,7 @@ export function EnhancedPlayerSelectionTable({
                 <TableHead className="text-white text-center">Price</TableHead>
                 <TableHead className="text-white text-center">Points</TableHead>
                 <TableHead className="text-white text-center">Form</TableHead>
-                <TableHead className="text-white text-center">Selected %</TableHead>
+                <TableHead className="text-white text-center">ICT Index</TableHead>
                 <TableHead className="text-white text-center">Status</TableHead>
                 <TableHead className="text-white text-center">Actions</TableHead>
               </TableRow>
@@ -367,7 +367,8 @@ export function EnhancedPlayerSelectionTable({
                     </TableCell>
                     
                     <TableCell className="text-center text-white">
-                      {player.selected_by_percent}%
+                      <div className="font-medium">{player.ict_index || '0.0'}</div>
+                      <div className="text-xs text-white/60">ICT</div>
                     </TableCell>
                     
                     <TableCell className="text-center">

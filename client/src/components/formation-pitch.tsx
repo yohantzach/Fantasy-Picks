@@ -6,6 +6,7 @@ interface FormationPitchProps {
   selectedPlayers: number[];
   players: FPLPlayer[];
   onPositionClick: (elementType: number) => void;
+  onPlayerClick?: (playerId: number, elementType: number) => void;
   captainId?: number | null;
   viceCaptainId?: number | null;
   fplTeams?: any[];

@@ -212,7 +212,7 @@ export default function ManualPaymentPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="p-4 bg-fpl-green/10 border border-fpl-green/20 rounded-lg">
-                  <h3 className="text-fpl-green font-semibold mb-2">UPI Payment (Recommended)</h3>
+                  <h3 className="text-fpl-green font-semibold mb-2">UPI Payment</h3>
                   <p className="text-white/80 text-sm mb-3">
                     Send ₹20 to our UPI ID:
                   </p>
@@ -228,7 +228,7 @@ export default function ManualPaymentPage() {
                   <div className="text-center">
                     <div className="inline-block p-4 bg-white rounded-lg">
                       <img 
-                        src="/src/assets/upi-qr-code.png" 
+                        src="/src/assets/upi-qr-code.jpg" 
                         alt="UPI QR Code for pbganesh1611@oksbi" 
                         className="w-48 h-48 object-contain"
                         onError={(e) => {
@@ -238,25 +238,6 @@ export default function ManualPaymentPage() {
                       />
                     </div>
                     <p className="text-white/60 text-sm mt-2">Scan QR code with any UPI app to pay ₹20</p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <h3 className="text-blue-400 font-semibold mb-2">Bank Transfer</h3>
-                  <div className="space-y-2 text-sm text-white/80">
-                    <p><span className="font-medium">Account Name:</span> MR GANESH B</p>
-                    <p><span className="font-medium">Account No:</span> 1234567890123456</p>
-                    <p><span className="font-medium">IFSC:</span> SBIN0001234</p>
-                    <p><span className="font-medium">Bank:</span> State Bank of India</p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                  <h3 className="text-yellow-400 font-semibold mb-2">Digital Wallets</h3>
-                  <div className="space-y-1 text-sm text-white/80">
-                    <p><span className="font-medium">PhonePe:</span> 7540052627</p>
-                    <p><span className="font-medium">Google Pay:</span> 7540052627</p>
-                    <p><span className="font-medium">Paytm:</span> 7540052627</p>
                   </div>
                 </div>
 
@@ -290,11 +271,6 @@ export default function ManualPaymentPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="upi">UPI</SelectItem>
-                        <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="phonepe">PhonePe</SelectItem>
-                        <SelectItem value="googlepay">Google Pay</SelectItem>
-                        <SelectItem value="paytm">Paytm</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

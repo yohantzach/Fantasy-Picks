@@ -55,11 +55,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({
-    name: user?.name || "",
-    phone: user?.phone || "",
-  });
+  // Removed editing functionality - profile is now view-only
 
   // Redirect if not logged in
   if (!user) {
@@ -195,28 +191,9 @@ export default function ProfilePage() {
                     <User className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <Input
-                          value={editData.name}
-                          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                          className="bg-white/20 border-white/30 text-white"
-                          placeholder="Full Name"
-                        />
-                        <Input
-                          value={editData.phone}
-                          onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                          className="bg-white/20 border-white/30 text-white"
-                          placeholder="Phone Number"
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <h2 className="text-2xl font-bold text-white">{user.name}</h2>
-                        <p className="text-white/70">{user.email}</p>
-                        <p className="text-white/70">{user.phone}</p>
-                      </>
-                    )}
+                    <h2 className="text-2xl font-bold text-white">{user.name}</h2>
+                    <p className="text-white/70">{user.email}</p>
+                    <p className="text-white/70">{user.phone}</p>
                   </div>
                 </div>
                 
@@ -242,44 +219,6 @@ export default function ProfilePage() {
                     Member since {user.createdAt ? format(new Date(user.createdAt), 'MMM yyyy') : 'Unknown'}
                   </Badge>
                 </div>
-              </div>
-              
-              <div className="flex gap-2">
-                {isEditing ? (
-                  <>
-                    <Button
-                      onClick={handleSaveProfile}
-                      disabled={updateProfileMutation.isPending}
-                      className="bg-fpl-green hover:bg-green-600"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditData({
-                          name: user.name || "",
-                          phone: user.phone || "",
-                        });
-                      }}
-                      className="border-white/30 text-white hover:bg-white/10"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsEditing(true)}
-                    className="border-white/30 text-white hover:bg-white/10"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Profile
-                  </Button>
-                )}
               </div>
             </div>
           </CardContent>
