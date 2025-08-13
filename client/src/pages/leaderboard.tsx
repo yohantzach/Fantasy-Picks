@@ -136,21 +136,21 @@ export default function Leaderboard() {
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card className="glass-card border-white/20">
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-4 text-center flex flex-col items-center justify-center">
               <Users className="h-8 w-8 text-fpl-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">{leaderboard.length}</div>
               <div className="text-white/60 text-sm">Active Managers</div>
             </CardContent>
           </Card>
           <Card className="glass-card border-white/20">
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-4 text-center flex flex-col items-center justify-center">
               <Calendar className="h-8 w-8 text-fpl-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">GW{currentGameweek?.gameweekNumber || "21"}</div>
               <div className="text-white/60 text-sm">Current Gameweek</div>
             </CardContent>
           </Card>
           <Card className="glass-card border-white/20">
-            <CardContent className="p-4 text-center">
+            <CardContent className="p-4 text-center flex flex-col items-center justify-center">
               <TrendingUp className="h-8 w-8 text-fpl-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">
                 {leaderboard.length > 0 ? leaderboard[0]?.totalPoints || "TBD" : "TBD"}
@@ -173,17 +173,19 @@ export default function Leaderboard() {
                 {leaderboard.map((entry: LeaderboardEntry) => (
                   <div
                     key={entry.id}
-                    className={`flex items-center justify-between rounded-lg p-4 border transition-all hover:scale-[1.02] ${getRankBg(entry.rank)}`}
+                    className={`flex items-center justify-between rounded-lg p-3 sm:p-4 border transition-all hover:scale-[1.02] ${getRankBg(entry.rank)}`}
                   >
-                    <div className="flex items-center space-x-4">
-                      {getRankIcon(entry.rank)}
-                      <div>
-                        <div className="text-white font-semibold">{entry.userName}</div>
-                        <div className="text-white/60 text-sm">{entry.teamName}</div>
+                    <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                      <div className="flex-shrink-0">
+                        {getRankIcon(entry.rank)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white font-semibold text-sm sm:text-base truncate">{entry.userName}</div>
+                        <div className="text-white/60 text-xs sm:text-sm truncate">{entry.teamName}</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`font-bold text-xl ${entry.rank === 1 ? 'text-fpl-green' : 'text-white'}`}>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <div className={`font-bold text-lg sm:text-xl ${entry.rank === 1 ? 'text-fpl-green' : 'text-white'}`}>
                         {entry.totalPoints} pts
                       </div>
                       {entry.rank <= 3 && (

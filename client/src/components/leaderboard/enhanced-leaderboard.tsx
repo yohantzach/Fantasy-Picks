@@ -136,9 +136,9 @@ export function EnhancedLeaderboard() {
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-fpl-green" />
+          <CardContent className="pt-6 text-center">
+            <div className="flex flex-col items-center justify-center space-y-2">
+              <Users className="h-8 w-8 text-fpl-green mx-auto" />
               <div>
                 <p className="text-sm text-white/60">Total Players</p>
                 <p className="text-2xl font-bold text-white">{data.totalParticipants}</p>
@@ -148,9 +148,9 @@ export function EnhancedLeaderboard() {
         </Card>
         
         <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-fpl-green" />
+          <CardContent className="pt-6 text-center">
+            <div className="flex flex-col items-center justify-center space-y-2">
+              <TrendingUp className="h-8 w-8 text-fpl-green mx-auto" />
               <div>
                 <p className="text-sm text-white/60">Your Teams</p>
                 <p className="text-2xl font-bold text-white">{data.userTeams.length}</p>
@@ -160,9 +160,9 @@ export function EnhancedLeaderboard() {
         </Card>
         
         <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <Trophy className="h-5 w-5 text-fpl-green" />
+          <CardContent className="pt-6 text-center">
+            <div className="flex flex-col items-center justify-center space-y-2">
+              <Trophy className="h-8 w-8 text-fpl-green mx-auto" />
               <div>
                 <p className="text-sm text-white/60">Best Rank</p>
                 <p className="text-2xl font-bold text-white">
@@ -193,7 +193,7 @@ export function EnhancedLeaderboard() {
               {data.topTeams.map((team) => (
                 <div
                   key={team.teamId}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition-all hover:scale-[1.02] ${
+                  className={`flex items-center justify-between p-3 sm:p-4 rounded-lg border transition-all hover:scale-[1.02] ${
                     team.rank <= 3 
                       ? team.rank === 1 
                         ? 'bg-gradient-to-r from-yellow-400/20 to-yellow-600/20 border-yellow-400/30'
@@ -203,14 +203,16 @@ export function EnhancedLeaderboard() {
                       : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    {getRankDisplay(team.rank)}
-                    <div>
-                      <p className="font-medium text-white">{team.teamName}</p>
-                      <p className="text-sm text-white/60">by {team.userName}</p>
+                  <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                    <div className="flex-shrink-0">
+                      {getRankDisplay(team.rank)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-white text-sm sm:text-base truncate">{team.teamName}</p>
+                      <p className="text-xs sm:text-sm text-white/60 truncate">by {team.userName}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className={`font-bold ${
+                  <Badge variant="outline" className={`font-bold text-xs sm:text-sm flex-shrink-0 ml-2 ${
                     team.rank === 1 ? 'border-fpl-green text-fpl-green' : 'border-white/40 text-white'
                   }`}>
                     {team.totalPoints} pts
