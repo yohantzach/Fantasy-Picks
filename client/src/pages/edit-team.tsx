@@ -308,6 +308,16 @@ export default function EditTeam() {
       return;
     }
 
+    // STRICT BUDGET ENFORCEMENT - Cannot exceed £100m
+    if (totalCost > 1000) {
+      toast({
+        title: "Budget Exceeded!",
+        description: `Your team costs £${(totalCost / 10).toFixed(1)}m. You must stay within the £100.0m budget.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const teamData = {
       teamName: teamName.trim(),
       formation: "4-4-2",
