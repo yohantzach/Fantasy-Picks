@@ -135,37 +135,37 @@ export function EnhancedLeaderboard() {
     <div className="space-y-6">
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-blue-600" />
+              <Users className="h-5 w-5 text-fpl-green" />
               <div>
-                <p className="text-sm text-gray-600">Total Players</p>
-                <p className="text-2xl font-bold">{data.totalParticipants}</p>
+                <p className="text-sm text-white/60">Total Players</p>
+                <p className="text-2xl font-bold text-white">{data.totalParticipants}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-green-600" />
+              <TrendingUp className="h-5 w-5 text-fpl-green" />
               <div>
-                <p className="text-sm text-gray-600">Your Teams</p>
-                <p className="text-2xl font-bold">{data.userTeams.length}</p>
+                <p className="text-sm text-white/60">Your Teams</p>
+                <p className="text-2xl font-bold text-white">{data.userTeams.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <Trophy className="h-5 w-5 text-yellow-600" />
+              <Trophy className="h-5 w-5 text-fpl-green" />
               <div>
-                <p className="text-sm text-gray-600">Best Rank</p>
-                <p className="text-2xl font-bold">
+                <p className="text-sm text-white/60">Best Rank</p>
+                <p className="text-2xl font-bold text-white">
                   {data.userTeams.length > 0 
                     ? Math.min(...data.userTeams.map(t => t.rank))
                     : '-'}
@@ -178,13 +178,13 @@ export function EnhancedLeaderboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top 10 Leaderboard */}
-        <Card>
+        <Card className="bg-white/10 border-white/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-yellow-600" />
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Trophy className="h-5 w-5 text-fpl-green" />
               Top 10 Leaderboard
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-white/60">
               Best performing teams this gameweek
             </CardDescription>
           </CardHeader>
@@ -193,18 +193,26 @@ export function EnhancedLeaderboard() {
               {data.topTeams.map((team) => (
                 <div
                   key={team.teamId}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${
-                    team.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-orange-50' : 'bg-gray-50'
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all hover:scale-[1.02] ${
+                    team.rank <= 3 
+                      ? team.rank === 1 
+                        ? 'bg-gradient-to-r from-yellow-400/20 to-yellow-600/20 border-yellow-400/30'
+                        : team.rank === 2
+                        ? 'bg-gradient-to-r from-gray-300/20 to-gray-500/20 border-gray-400/30'
+                        : 'bg-gradient-to-r from-orange-400/20 to-orange-600/20 border-orange-400/30'
+                      : 'bg-white/5 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <div className="flex items-center space-x-3">
                     {getRankDisplay(team.rank)}
                     <div>
-                      <p className="font-medium">{team.teamName}</p>
-                      <p className="text-sm text-gray-600">by {team.userName}</p>
+                      <p className="font-medium text-white">{team.teamName}</p>
+                      <p className="text-sm text-white/60">by {team.userName}</p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="font-bold">
+                  <Badge variant="outline" className={`font-bold ${
+                    team.rank === 1 ? 'border-fpl-green text-fpl-green' : 'border-white/40 text-white'
+                  }`}>
                     {team.totalPoints} pts
                   </Badge>
                 </div>
@@ -214,20 +222,20 @@ export function EnhancedLeaderboard() {
         </Card>
 
         {/* User Teams */}
-        <Card>
+        <Card className="bg-white/10 border-white/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Star className="h-5 w-5 text-fpl-green" />
               Your Teams
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-white/60">
               Your teams' performance this gameweek
             </CardDescription>
           </CardHeader>
           <CardContent>
             {data.userTeams.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-600">No teams created yet</p>
+                <p className="text-white/60">No teams created yet</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -236,21 +244,25 @@ export function EnhancedLeaderboard() {
                     key={team.teamId}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                       selectedUserTeam?.teamId === team.teamId
-                        ? 'bg-blue-50 border-blue-200'
-                        : 'bg-gray-50 hover:bg-gray-100'
+                        ? 'bg-fpl-green/20 border-fpl-green/40'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
                     }`}
                     onClick={() => setSelectedUserTeam(team)}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium">{team.teamName}</p>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <p className="font-medium text-white">{team.teamName}</p>
+                        <div className="flex items-center gap-2 text-sm text-white/60">
                           <span>Rank: #{team.rank}</span>
                           <span>•</span>
                           <span>{team.totalPoints} pts</span>
                         </div>
                       </div>
-                      <Badge variant={team.rank <= 10 ? 'default' : 'secondary'}>
+                      <Badge variant="outline" className={`${
+                        team.rank <= 10 
+                          ? 'border-fpl-green text-fpl-green'
+                          : 'border-white/40 text-white'
+                      }`}>
                         {team.rank <= 10 ? 'Top 10' : `#${team.rank}`}
                       </Badge>
                     </div>
@@ -264,25 +276,25 @@ export function EnhancedLeaderboard() {
 
       {/* Team Details */}
       {selectedUserTeam && (
-        <Card>
+        <Card className="bg-white/10 border-white/20">
           <CardHeader>
-            <CardTitle>{selectedUserTeam.teamName} - Squad Breakdown</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">{selectedUserTeam.teamName} - Squad Breakdown</CardTitle>
+            <CardDescription className="text-white/60">
               Detailed scoring for your selected team (Rank: #{selectedUserTeam.rank})
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {/* Team Summary */}
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-fpl-green/20 to-blue-500/20 rounded-lg border border-fpl-green/30">
                 <div>
-                  <p className="text-lg font-bold">Total Points: {selectedUserTeam.totalPoints}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-lg font-bold text-white">Total Points: {selectedUserTeam.totalPoints}</p>
+                  <p className="text-sm text-white/60">
                     Rank: #{selectedUserTeam.rank} of {data.totalParticipants}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-white/60">
                     Top {Math.round((selectedUserTeam.rank / data.totalParticipants) * 100)}%
                   </p>
                 </div>
@@ -290,36 +302,38 @@ export function EnhancedLeaderboard() {
 
               {/* Players List */}
               <div className="space-y-2">
-                <h4 className="font-medium text-gray-900">Squad Performance</h4>
+                <h4 className="font-medium text-white">Squad Performance</h4>
                 {selectedUserTeam.players.map((player) => (
                   <div
                     key={player.playerId}
-                    className={`flex items-center justify-between p-3 rounded border ${
-                      player.isCaptain ? 'bg-yellow-50 border-yellow-200' :
-                      player.isViceCaptain ? 'bg-blue-50 border-blue-200' :
-                      'bg-gray-50'
+                    className={`flex items-center justify-between p-3 rounded border transition-colors ${
+                      player.isCaptain 
+                        ? 'bg-yellow-500/20 border-yellow-400/40' 
+                        : player.isViceCaptain 
+                        ? 'bg-blue-500/20 border-blue-400/40' 
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
                     }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs border-white/40 text-white">
                         {player.position}
                       </Badge>
                       <div>
-                        <p className="font-medium flex items-center gap-1">
+                        <p className="font-medium flex items-center gap-1 text-white">
                           {player.playerName}
                           {player.isCaptain && (
-                            <Badge className="bg-yellow-500 text-xs">C</Badge>
+                            <Badge className="bg-yellow-500 text-black text-xs">C</Badge>
                           )}
                           {player.isViceCaptain && (
-                            <Badge variant="secondary" className="text-xs">VC</Badge>
+                            <Badge className="bg-blue-500 text-white text-xs">VC</Badge>
                           )}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">{player.actualPoints} pts</p>
+                      <p className="font-bold text-white">{player.actualPoints} pts</p>
                       {player.isCaptain && player.points > 0 && (
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-white/60">
                           ({player.points} × 2)
                         </p>
                       )}
