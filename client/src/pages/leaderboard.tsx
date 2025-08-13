@@ -50,9 +50,7 @@ export default function Leaderboard() {
           </div>
           
           {/* Enhanced Leaderboard Component for Normal Users */}
-          <div className="glass-card border-white/20 p-6">
-            <EnhancedLeaderboard />
-          </div>
+          <EnhancedLeaderboard />
         </div>
       </div>
     );

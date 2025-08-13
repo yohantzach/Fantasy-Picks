@@ -135,7 +135,7 @@ export function EnhancedLeaderboard() {
     <div className="space-y-6">
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
+        <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
               <Users className="h-5 w-5 text-fpl-green" />
@@ -147,7 +147,7 @@ export function EnhancedLeaderboard() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
+        <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5 text-fpl-green" />
@@ -159,7 +159,7 @@ export function EnhancedLeaderboard() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
+        <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
               <Trophy className="h-5 w-5 text-fpl-green" />
@@ -178,7 +178,7 @@ export function EnhancedLeaderboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top 10 Leaderboard */}
-        <Card className="bg-white/10 border-white/20">
+        <Card className="glass-card border-white/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Trophy className="h-5 w-5 text-fpl-green" />
@@ -222,7 +222,7 @@ export function EnhancedLeaderboard() {
         </Card>
 
         {/* User Teams */}
-        <Card className="bg-white/10 border-white/20">
+        <Card className="glass-card border-white/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Star className="h-5 w-5 text-fpl-green" />
@@ -276,7 +276,7 @@ export function EnhancedLeaderboard() {
 
       {/* Team Details */}
       {selectedUserTeam && (
-        <Card className="bg-white/10 border-white/20">
+        <Card className="glass-card border-white/20">
           <CardHeader>
             <CardTitle className="text-white">{selectedUserTeam.teamName} - Squad Breakdown</CardTitle>
             <CardDescription className="text-white/60">
