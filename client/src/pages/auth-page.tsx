@@ -341,19 +341,19 @@ export default function AuthPage() {
       <div className="lg:hidden px-4 py-8 bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
         <div className="max-w-md mx-auto">
           <div className="space-y-5 text-white/90 mb-8">
-            <div className="flex items-center gap-3 text-base">
+            <div className="flex items-center justify-center gap-3 text-base">
               <Trophy className="h-6 w-6 text-fpl-green flex-shrink-0" />
               <span className="font-medium">Independent weekly competitions</span>
             </div>
-            <div className="flex items-center gap-3 text-base">
+            <div className="flex items-center justify-center gap-3 text-base">
               <DollarSign className="h-6 w-6 text-fpl-green flex-shrink-0" />
               <span className="font-medium">Fresh 100M budget every gameweek</span>
             </div>
-            <div className="flex items-center gap-3 text-base">
+            <div className="flex items-center justify-center gap-3 text-base">
               <Target className="h-6 w-6 text-fpl-green flex-shrink-0" />
               <span className="font-medium">Win exciting rewards weekly</span>
             </div>
-            <div className="flex items-center gap-3 text-base">
+            <div className="flex items-center justify-center gap-3 text-base">
               <Zap className="h-6 w-6 text-fpl-green flex-shrink-0" />
               <span className="font-medium">Real-time scoring & leaderboards</span>
             </div>
