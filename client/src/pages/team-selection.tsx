@@ -101,7 +101,7 @@ export default function TeamSelection() {
 
   const totalCost = useMemo(() => {
     const selectedPlayerObjs = players.filter(p => selectedPlayers.includes(p.id));
-    return selectedPlayerObjs.reduce((sum, p) => sum + (p.now_cost + 10), 0); // Add 1M (10 units) to each player
+    return selectedPlayerObjs.reduce((sum, p) => sum + p.now_cost, 0); // Use the custom pricing from queryClient
   }, [selectedPlayers, players]);
 
   const remainingBudget = 1000 - totalCost; // 100.0m total budget
@@ -135,11 +135,11 @@ export default function TeamSelection() {
         return false;
       }
 
-      // Check budget (add 1M inflation to player cost for validation)
-      if ((player.now_cost + 10) > remainingBudget) {
+      // Check budget (use custom pricing from queryClient)
+      if (player.now_cost > remainingBudget) {
         toast({
           title: "Insufficient Budget",
-          description: `You need £${(((player.now_cost + 10) - remainingBudget) / 10).toFixed(1)}m more`,
+          description: `You need £${((player.now_cost - remainingBudget) / 10).toFixed(1)}m more`,
           variant: "destructive",
         });
         return false;
@@ -457,7 +457,7 @@ export default function TeamSelection() {
                         <div key={playerId} className="flex justify-between items-center text-sm">
                           <span>{player.web_name}</span>
                           <div className="flex items-center gap-2">
-                            <span>£{((player.now_cost + 10) / 10).toFixed(1)}m</span>
+                            <span>£{(player.custom_price || player.now_cost / 10).toFixed(1)}m</span>
                             <Button
                               size="sm"
                               variant="ghost"

@@ -803,7 +803,7 @@ export default function EditTeam() {
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span>£{(player.now_cost / 10).toFixed(1)}m</span>
+                              <span>£{(player.custom_price || player.now_cost / 10).toFixed(1)}m</span>
                               {!isLocked && (
                                 <Button
                                   size="sm"

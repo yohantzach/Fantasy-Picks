@@ -21,10 +21,10 @@ interface EnhancedPlayerSelectionTableProps {
 type SortColumn = "price" | "points" | "form" | "selected";
 type SortOrder = "asc" | "desc";
 
-// Helper function to add 1 million to player price for display
+// Helper function to get the correct adjusted price from player data
 const getAdjustedPrice = (player: any) => {
-  const basePrice = player.now_cost / 10;
-  return basePrice + 1; // Add 1 million to the price
+  // Use the custom_price if available (already calculated in queryClient), otherwise fall back to now_cost/10
+  return player.custom_price || (player.now_cost / 10);
 };
 
 // Helper function to get injury status color

@@ -78,7 +78,7 @@ export function FormationPitch({
               <CardContent className="p-0.5 sm:p-1 text-center h-full flex flex-col justify-between">
                 {/* Price on top */}
                 <div className="text-xs font-bold text-green-600">
-                  £{((player.now_cost / 10) + 1).toFixed(1)}m
+                  £{(player.custom_price || player.now_cost / 10).toFixed(1)}m
                 </div>
                 
                 {/* Player name in middle */}
