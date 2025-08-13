@@ -62,6 +62,15 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
       <div className="flex flex-col lg:flex-row min-h-screen">
+        {/* Mobile Logo - Shows at top on mobile only */}
+        <div className="lg:hidden flex justify-center pt-8 pb-4">
+          <img 
+            src="/fantasy_logo.jpg" 
+            alt="Fantasy Picks Logo" 
+            className="h-16 sm:h-20 w-auto"
+          />
+        </div>
+        
         {/* Left side - Form */}
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <Card className="w-full max-w-md glass-card border-white/20">
@@ -289,7 +298,7 @@ export default function AuthPage() {
         <div className="hidden lg:flex flex-1 items-center justify-center p-8 bg-gradient-to-br from-fpl-purple to-purple-800">
           <div className="text-center max-w-lg">
             <img 
-              src="/fantasy-picks-logo.svg" 
+              src="/fantasy_logo.jpg" 
               alt="Fantasy Picks Logo" 
               className="h-32 xl:h-40 w-auto mx-auto mb-6"
             />
@@ -330,7 +339,7 @@ export default function AuthPage() {
           <div className="text-center max-w-sm mx-auto">
             <div className="flex items-center justify-center gap-3 mb-4">
               <img 
-                src="/fantasy-picks-logo.svg" 
+                src="/fantasy_logo.jpg" 
                 alt="Fantasy Picks Logo" 
                 className="h-12 w-auto"
               />
