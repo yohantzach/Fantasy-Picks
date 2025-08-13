@@ -61,20 +61,20 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
-      <div className="flex flex-col lg:flex-row min-h-screen">
-        {/* Mobile Logo and Title - Shows at top on mobile only */}
-        <div className="lg:hidden text-center pt-8 pb-6">
-          <img 
-            src="/fantasy_logo.jpg" 
-            alt="Fantasy Picks Logo" 
-            className="h-16 sm:h-20 w-auto mx-auto mb-4"
-          />
-          <h1 className="text-2xl font-bold text-white mb-1">Fantasy Picks</h1>
-          <p className="text-lg text-fpl-green font-semibold">Weekly Competition</p>
-        </div>
-        
+      {/* Mobile Logo and Title - Shows at top on mobile only */}
+      <div className="lg:hidden text-center pt-8 pb-6">
+        <img 
+          src="/fantasy_logo.jpg" 
+          alt="Fantasy Picks Logo" 
+          className="h-16 sm:h-20 w-auto mx-auto mb-4"
+        />
+        <h1 className="text-2xl font-bold text-white mb-1">Fantasy Picks</h1>
+        <p className="text-lg text-fpl-green font-semibold">Weekly Competition</p>
+      </div>
+      
+      <div className="flex flex-col lg:flex-row lg:min-h-screen">
         {/* Left side - Form */}
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 lg:min-h-screen">
           <Card className="w-full max-w-md glass-card border-white/20">
             <CardHeader className="text-center px-4 sm:px-6 py-4 sm:py-6">
               <CardTitle className="text-xl sm:text-2xl font-bold text-white">
@@ -294,34 +294,6 @@ export default function AuthPage() {
               </div>
             </CardContent>
           </Card>
-          
-          {/* Mobile Features Section - Shows after login form on mobile only */}
-          <div className="lg:hidden mt-8 max-w-md mx-auto px-4">
-            <div className="space-y-4 text-white/80 mb-6">
-              <p className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-fpl-green flex-shrink-0" />
-                <span>Independent weekly competitions</span>
-              </p>
-              <p className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-fpl-green flex-shrink-0" />
-                <span>Fresh 100M budget every gameweek</span>
-              </p>
-              <p className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-fpl-green flex-shrink-0" />
-                <span>Win exciting rewards weekly</span>
-              </p>
-              <p className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-fpl-green flex-shrink-0" />
-                <span>Real-time scoring & leaderboards</span>
-              </p>
-            </div>
-            
-            <div className="p-4 bg-white/10 rounded-lg border border-white/20 backdrop-blur-sm text-center">
-              <p className="text-sm text-white/70 mb-2">Contest Prize</p>
-              <p className="text-3xl font-bold text-fpl-green">₹10,000</p>
-              <p className="text-sm text-white/70">to be won in the contest</p>
-            </div>
-          </div>
         </div>
   
         {/* Right side - Hero (hidden on mobile/tablet, visible on desktop) */}
@@ -363,7 +335,36 @@ export default function AuthPage() {
             </div>
           </div>
         </div>
-  
+      </div>
+      
+      {/* Mobile Features Section - Shows below login form on mobile only */}
+      <div className="lg:hidden px-4 py-8 bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
+        <div className="max-w-md mx-auto">
+          <div className="space-y-5 text-white/90 mb-8">
+            <div className="flex items-center gap-3 text-base">
+              <Trophy className="h-6 w-6 text-fpl-green flex-shrink-0" />
+              <span className="font-medium">Independent weekly competitions</span>
+            </div>
+            <div className="flex items-center gap-3 text-base">
+              <DollarSign className="h-6 w-6 text-fpl-green flex-shrink-0" />
+              <span className="font-medium">Fresh 100M budget every gameweek</span>
+            </div>
+            <div className="flex items-center gap-3 text-base">
+              <Target className="h-6 w-6 text-fpl-green flex-shrink-0" />
+              <span className="font-medium">Win exciting rewards weekly</span>
+            </div>
+            <div className="flex items-center gap-3 text-base">
+              <Zap className="h-6 w-6 text-fpl-green flex-shrink-0" />
+              <span className="font-medium">Real-time scoring & leaderboards</span>
+            </div>
+          </div>
+          
+          <div className="p-6 bg-white/15 rounded-xl border border-white/25 backdrop-blur-sm text-center shadow-lg">
+            <p className="text-sm text-white/80 mb-3 font-medium">Contest Prize</p>
+            <p className="text-4xl font-bold text-fpl-green mb-2">₹10,000</p>
+            <p className="text-sm text-white/80">to be won in the contest</p>
+          </div>
+        </div>
       </div>
     </div>
   );
