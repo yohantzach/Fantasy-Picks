@@ -68,6 +68,7 @@ export default function EditTeam() {
     queryKey: ["/api/team", currentTeamNumber],
     queryFn: () => apiRequest("GET", `/api/team/${currentTeamNumber}`),
     enabled: !!currentTeamData && currentTeamNumber > 0,
+    retry: 1,
   });
 
   // Fetch FPL data
@@ -79,27 +80,22 @@ export default function EditTeam() {
     queryKey: ["/api/fpl/teams"],
   });
 
-  // Load current team data when both team and player data are available
+  // Load current team data when team data changes
   useEffect(() => {
-    if (currentTeam && players.length > 0) {
-      // Backend sends players as array of player IDs directly
-      if (currentTeam.players && Array.isArray(currentTeam.players) && currentTeam.players.length > 0) {
-        // currentTeam.players is already an array of player IDs (numbers)
-        const playerIds = currentTeam.players.map((id: any) => parseInt(id.toString())).filter(id => !isNaN(id));
-        
-        // Validate that these player IDs exist in our FPL players data
-        const validPlayerIds = playerIds.filter((id: number) => 
-          players.some((p: any) => p.id === id)
-        );
+    // Reset state when switching teams
+    if (currentTeamNumber && (!selectedPlayers.length || selectedPlayers.length === 0)) {
+      // Load from currentTeamData (teams list) immediately if available
+      if (currentTeamData && currentTeamData.players && Array.isArray(currentTeamData.players) && currentTeamData.players.length > 0 && players.length > 0) {
+        const playerIds = currentTeamData.players.map((id: any) => parseInt(id.toString())).filter(id => !isNaN(id));
+        const validPlayerIds = playerIds.filter((id: number) => players.some((p: any) => p.id === id));
         
         if (validPlayerIds.length > 0) {
           setSelectedPlayers(validPlayerIds);
-          setTeamName(currentTeam.teamName || "");
-          setCaptainId(currentTeam.captainId || null);
-          setViceCaptainId(currentTeam.viceCaptainId || null);
+          setTeamName(currentTeamData.teamName || "");
+          setCaptainId(currentTeamData.captainId || null);
+          setViceCaptainId(currentTeamData.viceCaptainId || null);
           setIsModified(false);
           
-          // Show success toast
           const selectedPlayerObjs = players.filter((p: any) => validPlayerIds.includes(p.id));
           const teamValue = selectedPlayerObjs.reduce((sum: number, p: any) => sum + p.now_cost, 0);
           
@@ -108,16 +104,30 @@ export default function EditTeam() {
             description: `${validPlayerIds.length} players loaded • £${(teamValue / 10).toFixed(1)}m value`,
           });
         }
-      } else {
-        // Team exists but no players - initialize empty
-        setSelectedPlayers([]);
-        setTeamName(currentTeam.teamName || "");
-        setCaptainId(null);
-        setViceCaptainId(null);
-        setIsModified(false);
+      }
+      // Also try loading from individual team API if available
+      else if (currentTeam && currentTeam.players && Array.isArray(currentTeam.players) && currentTeam.players.length > 0 && players.length > 0) {
+        const playerIds = currentTeam.players.map((id: any) => parseInt(id.toString())).filter(id => !isNaN(id));
+        const validPlayerIds = playerIds.filter((id: number) => players.some((p: any) => p.id === id));
+        
+        if (validPlayerIds.length > 0) {
+          setSelectedPlayers(validPlayerIds);
+          setTeamName(currentTeam.teamName || "");
+          setCaptainId(currentTeam.captainId || null);
+          setViceCaptainId(currentTeam.viceCaptainId || null);
+          setIsModified(false);
+          
+          const selectedPlayerObjs = players.filter((p: any) => validPlayerIds.includes(p.id));
+          const teamValue = selectedPlayerObjs.reduce((sum: number, p: any) => sum + p.now_cost, 0);
+          
+          toast({
+            title: "Team Loaded",
+            description: `${validPlayerIds.length} players loaded • £${(teamValue / 10).toFixed(1)}m value`,
+          });
+        }
       }
     }
-  }, [currentTeam, players, toast]);
+  }, [currentTeamData, currentTeam, players, currentTeamNumber, toast]);
 
   // Track modifications
   useEffect(() => {
@@ -319,8 +329,15 @@ export default function EditTeam() {
   const hasEditAccess = currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed;
   const teamExists = currentTeam && currentTeam.players && currentTeam.players.length > 0;
   
-  // Update URL when switching tabs
+  // Update URL when switching tabs and reset selected players
   const handleTabChange = (teamNumber: string) => {
+    // Reset player state when switching teams
+    setSelectedPlayers([]);
+    setTeamName("");
+    setCaptainId(null);
+    setViceCaptainId(null);
+    setIsModified(false);
+    
     setActiveTeamTab(teamNumber);
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('team', teamNumber);
@@ -367,14 +384,28 @@ export default function EditTeam() {
                 Back to Team
               </Button>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                <Edit3 className="h-8 w-8 text-fpl-green" />
-                Edit Team
-              </h1>
-              <p className="text-muted-foreground">
-                {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber} • ${getGameweekStatus()}` : "Loading..."}
-              </p>
+            <div className="flex items-center gap-4">
+              <img 
+                src="/fantasy-picks-logo.png" 
+                alt="Fantasy Picks Logo" 
+                className="h-12 w-auto"
+                onError={(e) => {
+                  // Fallback to alternative logo if main logo fails
+                  const target = e.target as HTMLImageElement;
+                  if (target.src.includes('fantasy-picks-logo.png')) {
+                    target.src = '/fantasy_logo.jpg';
+                  }
+                }}
+              />
+              <div>
+                <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
+                  <Edit3 className="h-8 w-8 text-fpl-green" />
+                  Edit Team
+                </h1>
+                <p className="text-muted-foreground">
+                  {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber} • ${getGameweekStatus()}` : "Loading..."}
+                </p>
+              </div>
             </div>
           </div>
           <div className="text-right">
@@ -637,7 +668,8 @@ export default function EditTeam() {
           </Card>
         )}
 
-        {currentTeam && !showPlayerTable ? (
+        {/* Show editing interface for approved teams */}
+        {currentTeamData && currentTeamData.paymentStatus === 'approved' && !showPlayerTable ? (
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Formation Pitch */}
             <div className="lg:col-span-2">
@@ -667,7 +699,7 @@ export default function EditTeam() {
                   {/* Team Name - Always Locked for Approved Teams */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-white">{currentTeam?.teamName || 'Team Name'}</h3>
+                      <h3 className="text-lg font-semibold text-white">{currentTeam?.teamName || currentTeamData?.teamName || teamName || `Team ${currentTeamNumber}`}</h3>
                       <Badge variant="secondary" className="text-xs bg-white/10">
                         <Lock className="h-3 w-3 mr-1" />
                         Fixed

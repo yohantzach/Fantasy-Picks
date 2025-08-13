@@ -228,7 +228,7 @@ export default function ManualPaymentPage() {
                   <div className="text-center">
                     <div className="inline-block p-4 bg-white rounded-lg">
                       <img 
-                        src="/src/assets/upi-qr-code.jpg" 
+                        src="/qrcodev2.jpg" 
                         alt="UPI QR Code for pbganesh1611@oksbi" 
                         className="w-48 h-48 object-contain"
                         onError={(e) => {

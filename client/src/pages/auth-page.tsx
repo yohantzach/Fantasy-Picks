@@ -122,7 +122,7 @@ export default function AuthPage() {
                     <PoliciesModal 
                       trigger={
                         <button type="button" className="text-fpl-green hover:text-green-400 underline font-medium">
-                          Terms & Conditions, Privacy Policy, and Refund Policy
+                          Terms & Conditions and Privacy Policy
                         </button>
                       }
                     />
@@ -236,7 +236,7 @@ export default function AuthPage() {
                         <PoliciesModal 
                           trigger={
                             <button type="button" className="text-fpl-green hover:text-green-400 underline font-medium">
-                              Terms & Conditions, Privacy Policy, and Refund Policy
+                              Terms & Conditions and Privacy Policy
                             </button>
                           }
                         />
@@ -314,9 +314,9 @@ export default function AuthPage() {
             </p>
           </div>
           <div className="mt-8 p-6 bg-white/10 rounded-lg border border-white/20 backdrop-blur-sm">
-            <p className="text-sm text-white/70 mb-2">Entry Fee</p>
-            <p className="text-4xl font-bold text-fpl-green">₹20</p>
-            <p className="text-sm text-white/70">per gameweek</p>
+            <p className="text-sm text-white/70 mb-2">Contest Prize</p>
+            <p className="text-4xl font-bold text-fpl-green">₹10,000</p>
+            <p className="text-sm text-white/70">to be won in the contest</p>
           </div>
         </div>
       </div>

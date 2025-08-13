@@ -1201,6 +1201,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Check existing teams count for this user in this gameweek (enforce 5 team limit)
+      const existingTeamsCount = await db
+        .select()
+        .from(teams)
+        .where(
+          and(
+            eq(teams.userId, req.user!.id),
+            eq(teams.gameweekId, currentGameweek.id)
+          )
+        );
+      
+      // If trying to create a new team (not update), check the limit
+      const requestedTeamNumber = teamNumber || 1;
+      const existingTeamWithNumber = existingTeamsCount.find(t => t.teamNumber === requestedTeamNumber);
+      
+      if (!existingTeamWithNumber && existingTeamsCount.length >= 5) {
+        return res.status(400).json({ 
+          error: "Maximum 5 teams allowed per person per gameweek",
+          message: "You have already created the maximum number of teams for this gameweek."
+        });
+      }
+      
       // Check if user already has this specific team number for this gameweek
       const existingTeam = await db
         .select()
@@ -1209,7 +1231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(teams.userId, req.user!.id),
             eq(teams.gameweekId, currentGameweek.id),
-            eq(teams.teamNumber, teamNumber || 1)
+            eq(teams.teamNumber, requestedTeamNumber)
           )
         )
         .limit(1);

@@ -77,7 +77,13 @@ export default function ProfilePage() {
   const { data: gameweekHistory = [], isLoading: historyLoading } = useQuery({
     queryKey: ["/api/user/gameweek-history"],
     queryFn: async () => {
-      return apiRequest("GET", "/api/user/gameweek-history");
+      try {
+        const result = await apiRequest("GET", "/api/user/gameweek-history");
+        return Array.isArray(result) ? result : [];
+      } catch (error) {
+        console.error("Failed to fetch gameweek history:", error);
+        return [];
+      }
     }
   });
 
@@ -85,7 +91,13 @@ export default function ProfilePage() {
   const { data: paymentHistory = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ["/api/user/payment-history"],
     queryFn: async () => {
-      return apiRequest("GET", "/api/user/payment-history");
+      try {
+        const result = await apiRequest("GET", "/api/user/payment-history");
+        return Array.isArray(result) ? result : [];
+      } catch (error) {
+        console.error("Failed to fetch payment history:", error);
+        return [];
+      }
     }
   });
 
@@ -184,7 +196,11 @@ export default function ProfilePage() {
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <User className="h-8 w-8 sm:h-10 sm:w-10 text-fpl-green" />
+            <img 
+              src="/fantasy_logo.jpg" 
+              alt="Fantasy Picks Logo" 
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg object-cover"
+            />
             <span>My Profile</span>
           </h1>
           <p className="text-white/70 text-base sm:text-lg">
@@ -275,7 +291,7 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fpl-green"></div>
                   </div>
-                ) : gameweekHistory.length === 0 ? (
+                ) : !Array.isArray(gameweekHistory) || gameweekHistory.length === 0 ? (
                   <div className="text-center py-8 text-white/70">
                     <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
                     <p>No gameweek history yet</p>
@@ -283,7 +299,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {gameweekHistory.map((gw: GameweekHistory) => (
+                    {Array.isArray(gameweekHistory) && gameweekHistory.map((gw: GameweekHistory) => (
                       <div
                         key={gw.id}
                         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10"
@@ -330,7 +346,7 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fpl-green"></div>
                   </div>
-                ) : paymentHistory.length === 0 ? (
+                ) : !Array.isArray(paymentHistory) || paymentHistory.length === 0 ? (
                   <div className="text-center py-8 text-white/70">
                     <CreditCard className="h-16 w-16 mx-auto mb-4 opacity-50" />
                     <p>No payment history yet</p>
@@ -338,7 +354,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {paymentHistory.map((payment: PaymentHistory) => (
+                    {Array.isArray(paymentHistory) && paymentHistory.map((payment: PaymentHistory) => (
                       <div
                         key={payment.id}
                         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10"

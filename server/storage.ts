@@ -266,7 +266,7 @@ async createUser(insertUser: InsertUser): Promise<User> {
       .select()
       .from(teams)
       .where(and(eq(teams.userId, userId), eq(teams.gameweekId, gameweekId)))
-      .orderBy(desc(teams.createdAt));
+      .orderBy(teams.teamNumber); // Order by team number instead of createdAt for consistent display
   }
 
   async updateTeamLockStatus(teamId: number, isLocked: boolean): Promise<Team> {

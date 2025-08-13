@@ -38,6 +38,7 @@ interface Player {
   form?: string;
   selected_by_percent?: string;
   points_per_game?: string;
+  ict_index?: string;
 }
 
 interface PlayerStatsModalProps {
@@ -101,15 +102,7 @@ export function PlayerStatsModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 border-purple-500/30 text-white">
-        <DialogHeader className="relative">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute -top-2 -right-2 text-white/60 hover:text-white"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-white">
             Player Statistics
           </DialogTitle>
@@ -204,14 +197,7 @@ export function PlayerStatsModal({
 
           {/* Action Buttons */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Button
-              onClick={() => onReplace(player)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              size="sm"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Replace Player
-            </Button>
+            {/* Replace Player button removed but onReplace logic kept intact */}
             
             {showCaptainOption && (
               <Button

@@ -249,44 +249,6 @@ export default function Leaderboard() {
           </Card>
         )}
 
-        {/* Weekly Competition Info */}
-        <Card className="glass-card border-white/20">
-          <CardContent className="p-6">
-            <h3 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
-              <Award className="h-5 w-5 text-fpl-green" />
-              How Weekly Competition Works
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-white/80">
-              <div>
-                <h4 className="font-semibold text-fpl-green mb-2">Weekly Reset</h4>
-                <ul className="space-y-1 text-sm">
-                  <li>• Each gameweek is completely independent</li>
-                  <li>• Fresh £100M budget every week</li>
-                  <li>• No carry-over points from previous weeks</li>
-                  <li>• Winners determined by single gameweek performance</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-fpl-green mb-2">Scoring System</h4>
-                <ul className="space-y-1 text-sm">
-                  <li>• Official FPL scoring rules apply</li>
-                  <li>• Captain scores double points</li>
-                  <li>• Automatic substitutions for non-playing players</li>
-                  <li>• Live updates during match days</li>
-                </ul>
-              </div>
-            </div>
-            <div className="mt-6 p-4 bg-fpl-green/10 rounded-lg border border-fpl-green/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy className="h-5 w-5 text-fpl-green" />
-                <span className="font-semibold text-white">Entry Requirements</span>
-              </div>
-              <p className="text-white/80 text-sm">
-                Pay ₹20 entry fee to participate in each gameweek. Admin can access without payment for testing purposes.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

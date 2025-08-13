@@ -81,6 +81,18 @@ export default function RulesPage() {
                   <span className="font-medium">Save your team and make payment to be entered into the league</span>
                 </div>
               </div>
+
+              <Separator className="bg-white/20" />
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="border-yellow-400 text-yellow-400 mt-1">5</Badge>
+                  <div>
+                    <span className="font-medium">Maximum 5 teams per person per gameweek</span>
+                    <p className="text-sm text-white/70 mt-1">Each team requires a separate ₹20 payment and must be uniquely named</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

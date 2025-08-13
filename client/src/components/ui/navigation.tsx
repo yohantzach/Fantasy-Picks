@@ -65,9 +65,16 @@ export default function Navigation() {
           {/* Logo */}
           <div className="flex items-center space-x-4">
             <Link href="/" className="hover:opacity-80 transition-opacity">
-              <div>
-                <span className="text-white font-bold text-xl">Fantasy Picks</span>
-                <div className="text-fpl-green text-xs font-medium">Weekly League</div>
+              <div className="flex items-center space-x-3">
+                <img 
+                  src="/fantasy_logo.jpg" 
+                  alt="Fantasy Picks Logo" 
+                  className="h-10 w-10 rounded-lg object-cover"
+                />
+                <div>
+                  <span className="text-white font-bold text-xl">Fantasy Picks</span>
+                  <div className="text-fpl-green text-xs font-medium">Weekly League</div>
+                </div>
               </div>
             </Link>
             
