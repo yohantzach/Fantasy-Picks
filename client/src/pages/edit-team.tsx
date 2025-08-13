@@ -384,47 +384,83 @@ export default function EditTeam() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-green">
       <Navigation />
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
+      <div className="container mx-auto p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
+        {/* Mobile-Optimized Header */}
+        <div className="space-y-4">
+          {/* Mobile Back Button */}
+          <div className="flex items-center justify-between sm:hidden">
             <Link href="/">
               <Button variant="outline" size="sm" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Team
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
               </Button>
             </Link>
-            <div className="flex items-center gap-4">
-              <img 
-                src="/fantasy-picks-logo.png" 
-                alt="Fantasy Picks Logo" 
-                className="h-12 w-auto"
-                onError={(e) => {
-                  // Fallback to alternative logo if main logo fails
-                  const target = e.target as HTMLImageElement;
-                  if (target.src.includes('fantasy-picks-logo.png')) {
-                    target.src = '/fantasy_logo.jpg';
-                  }
-                }}
-              />
-              <div>
-                <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
-                  <Edit3 className="h-8 w-8 text-fpl-green" />
-                  Edit Team
-                </h1>
-                <p className="text-muted-foreground">
-                  {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber} • ${getGameweekStatus()}` : "Loading..."}
-                </p>
+            <div className="text-center">
+              <div className="text-lg font-bold text-fpl-green">
+                £{(remainingBudget / 10).toFixed(1)}m
               </div>
+              <p className="text-xs text-muted-foreground">Remaining</p>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-fpl-green">
-              £{(remainingBudget / 10).toFixed(1)}m
+          
+          {/* Desktop Header */}
+          <div className="hidden sm:flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <Link href="/">
+                <Button variant="outline" size="sm" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Team
+                </Button>
+              </Link>
+              <div className="flex items-center gap-4">
+                <img 
+                  src="/fantasy-picks-logo.png" 
+                  alt="Fantasy Picks Logo" 
+                  className="h-8 lg:h-12 w-auto"
+                  onError={(e) => {
+                    // Fallback to alternative logo if main logo fails
+                    const target = e.target as HTMLImageElement;
+                    if (target.src.includes('fantasy-picks-logo.png')) {
+                      target.src = '/fantasy_logo.jpg';
+                    }
+                  }}
+                />
+                <div>
+                  <h1 className="text-xl lg:text-3xl font-bold gradient-text flex items-center gap-2">
+                    <Edit3 className="h-5 lg:h-8 w-5 lg:w-8 text-fpl-green" />
+                    Edit Team
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber} • ${getGameweekStatus()}` : "Loading..."}
+                  </p>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">Budget Remaining</p>
+            <div className="text-right">
+              <div className="text-xl lg:text-2xl font-bold text-fpl-green">
+                £{(remainingBudget / 10).toFixed(1)}m
+              </div>
+              <p className="text-sm text-muted-foreground">Budget Remaining</p>
+              {isModified && (
+                <Badge variant="secondary" className="mt-1">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Unsaved Changes
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          {/* Mobile Title */}
+          <div className="text-center sm:hidden">
+            <h1 className="text-xl font-bold gradient-text flex items-center justify-center gap-2">
+              <Edit3 className="h-5 w-5 text-fpl-green" />
+              Edit Team
+            </h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber} • ${getGameweekStatus()}` : "Loading..."}
+            </p>
             {isModified && (
-              <Badge variant="secondary" className="mt-1">
+              <Badge variant="secondary" className="mt-2">
                 <AlertCircle className="h-3 w-3 mr-1" />
                 Unsaved Changes
               </Badge>
@@ -432,45 +468,45 @@ export default function EditTeam() {
           </div>
         </div>
 
-        {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Mobile-Optimized Status Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-white">
+            <CardContent className="p-3 lg:p-4 text-center">
+              <div className="text-lg lg:text-2xl font-bold text-white">
                 {selectedPlayers.length}/11
               </div>
-              <div className="text-sm text-white/60">Players Selected</div>
+              <div className="text-xs lg:text-sm text-white/60">Players</div>
             </CardContent>
           </Card>
           
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-4 text-center">
-              <div className={`text-2xl font-bold ${
+            <CardContent className="p-3 lg:p-4 text-center">
+              <div className={`text-lg lg:text-2xl font-bold ${
                 remainingBudget >= 0 ? 'text-fpl-green' : 'text-red-400'
               }`}>
                 £{(remainingBudget / 10).toFixed(1)}m
               </div>
-              <div className="text-sm text-white/60">Remaining Budget</div>
+              <div className="text-xs lg:text-sm text-white/60">Budget</div>
             </CardContent>
           </Card>
           
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-white">
+            <CardContent className="p-3 lg:p-4 text-center">
+              <div className="text-lg lg:text-2xl font-bold text-white">
                 £{(totalCost / 10).toFixed(1)}m
               </div>
-              <div className="text-sm text-white/60">Team Value</div>
+              <div className="text-xs lg:text-sm text-white/60">Value</div>
             </CardContent>
           </Card>
           
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-4 text-center">
-              <div className={`text-sm font-medium ${
+            <CardContent className="p-3 lg:p-4 text-center">
+              <div className={`text-xs lg:text-sm font-medium ${
                 isDeadlinePassed ? 'text-red-400' : 'text-fpl-green'
               }`}>
                 {getGameweekStatus()}
               </div>
-              <div className="text-sm text-white/60">Status</div>
+              <div className="text-xs lg:text-sm text-white/60">Status</div>
             </CardContent>
           </Card>
         </div>
@@ -550,9 +586,9 @@ export default function EditTeam() {
                   return (
                     <TabsContent key={teamNum} value={teamNum.toString()} className="mt-6">
                       {team ? (
-                        <div className="space-y-6">
-                          {/* Clean Team Status Card */}
-                          <div className={`p-6 rounded-xl border-2 transition-all ${
+                        <div className="space-y-4 lg:space-y-6">
+                          {/* Mobile-Optimized Team Status Card */}
+                          <div className={`p-4 lg:p-6 rounded-xl border-2 transition-all ${
                             team.paymentStatus === 'approved' 
                               ? 'bg-green-500/10 border-green-500/30 shadow-lg shadow-green-500/20'
                               : team.paymentStatus === 'pending'
@@ -561,7 +597,32 @@ export default function EditTeam() {
                               ? 'bg-red-500/10 border-red-500/30 shadow-lg shadow-red-500/20'
                               : 'bg-white/5 border-white/20'
                           }`}>
-                            <div className="flex items-center justify-between mb-4">
+                            {/* Mobile Header */}
+                            <div className="sm:hidden space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-white">
+                                  {team.teamName || `Team ${teamNum}`}
+                                </h3>
+                                {getPaymentStatusBadge(team.paymentStatus)}
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="bg-white/5 rounded p-2">
+                                  <div className="text-sm font-medium text-white">{Array.isArray(team.players) ? team.players.length : 0}/11</div>
+                                  <div className="text-xs text-white/60">Players</div>
+                                </div>
+                                <div className="bg-white/5 rounded p-2">
+                                  <div className="text-sm font-medium text-white">£{(parseFloat(team.totalValue?.toString() || '0')).toFixed(1)}m</div>
+                                  <div className="text-xs text-white/60">Value</div>
+                                </div>
+                                <div className="bg-white/5 rounded p-2">
+                                  <div className="text-sm font-medium text-white">{team.totalPoints || 0}</div>
+                                  <div className="text-xs text-white/60">Points</div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Desktop Header */}
+                            <div className="hidden sm:flex items-center justify-between mb-4">
                               <div>
                                 <h3 className="text-xl font-bold text-white mb-1">
                                   {team.teamName || `Team ${teamNum}`}
@@ -578,41 +639,43 @@ export default function EditTeam() {
                             </div>
                             
                             {/* Status-specific content */}
-                            {team.paymentStatus === 'approved' ? (
-                              <div className="flex items-center gap-2 text-green-400">
-                                <CheckCircle2 className="h-5 w-5" />
-                                <span className="font-medium">Team is ready for editing</span>
-                              </div>
-                            ) : team.paymentStatus === 'pending' ? (
-                              <div className="flex items-center gap-2 text-yellow-400">
-                                <Timer className="h-5 w-5" />
-                                <span className="font-medium">Payment pending approval</span>
-                              </div>
-                            ) : team.paymentStatus === 'rejected' ? (
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-red-400">
-                                  <XCircle className="h-5 w-5" />
-                                  <span className="font-medium">Payment rejected - resubmit required</span>
+                            <div className="mt-3 sm:mt-0">
+                              {team.paymentStatus === 'approved' ? (
+                                <div className="flex items-center gap-2 text-green-400">
+                                  <CheckCircle2 className="h-4 sm:h-5 w-4 sm:w-5" />
+                                  <span className="text-sm sm:text-base font-medium">Team is ready for editing</span>
                                 </div>
-                                <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
-                                  <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                                    Resubmit Payment
-                                  </Button>
-                                </Link>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-orange-400">
-                                  <AlertCircle className="h-5 w-5" />
-                                  <span className="font-medium">Payment required</span>
+                              ) : team.paymentStatus === 'pending' ? (
+                                <div className="flex items-center gap-2 text-yellow-400">
+                                  <Timer className="h-4 sm:h-5 w-4 sm:w-5" />
+                                  <span className="text-sm sm:text-base font-medium">Payment pending approval</span>
                                 </div>
-                                <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
-                                  <Button size="sm" className="bg-fpl-green hover:bg-green-600">
-                                    Complete Payment
-                                  </Button>
-                                </Link>
-                              </div>
-                            )}
+                              ) : team.paymentStatus === 'rejected' ? (
+                                <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                                  <div className="flex items-center gap-2 text-red-400">
+                                    <XCircle className="h-4 sm:h-5 w-4 sm:w-5" />
+                                    <span className="text-sm sm:text-base font-medium">Payment rejected</span>
+                                  </div>
+                                  <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
+                                    <Button size="sm" className="bg-red-600 hover:bg-red-700 w-full sm:w-auto">
+                                      Resubmit Payment
+                                    </Button>
+                                  </Link>
+                                </div>
+                              ) : (
+                                <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
+                                  <div className="flex items-center gap-2 text-orange-400">
+                                    <AlertCircle className="h-4 sm:h-5 w-4 sm:w-5" />
+                                    <span className="text-sm sm:text-base font-medium">Payment required</span>
+                                  </div>
+                                  <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
+                                    <Button size="sm" className="bg-fpl-green hover:bg-green-600 w-full sm:w-auto">
+                                      Complete Payment
+                                    </Button>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ) : (
