@@ -26,49 +26,43 @@ export async function apiRequest(
 // Custom pricing function with position bonuses
 const applyCustomPricing = async (players: any[]) => {
   try {
-    // Fetch custom prices from JSON file
-    const priceResponse = await fetch('/fpl_player_prices.json');
-    const customPrices = await priceResponse.json();
-    
-    // Create a price lookup map
-    const priceMap = new Map(customPrices.map((p: any) => [p.id, p.price]));
-    
     return players.map(player => {
-      const basePrice = priceMap.get(player.id) || 4.0; // Default price if not found
+      // Get original FPL price in millions (divide API units by 10)
+      const originalPrice = player.now_cost / 10;
       
-      // Apply position-based bonuses, then reduce £1m from everyone
-      let adjustedPrice = basePrice;
+      // Apply position-based bonuses to original FPL prices
+      let adjustedPrice = originalPrice;
       
       switch (player.element_type) {
         case 1: // Goalkeeper
         case 2: // Defender
-          adjustedPrice = basePrice + 1.0; // +1.0m
+          adjustedPrice = originalPrice + 1.0; // +£1.0m bonus
           break;
         case 3: // Midfielder
-          adjustedPrice = basePrice + 1.5; // +1.5m
+          adjustedPrice = originalPrice + 1.5; // +£1.5m bonus
           break;
         case 4: // Forward
-          adjustedPrice = basePrice + 2.5; // +2.5m
+          adjustedPrice = originalPrice + 2.5; // +£2.5m bonus
           break;
         default:
-          adjustedPrice = basePrice;
+          adjustedPrice = originalPrice;
       }
       
-      // Reduce £1m from every player
-      adjustedPrice = Math.max(adjustedPrice - 1.0, 4.0); // Minimum price £4.0m
+      // Ensure minimum price £4.0m
+      adjustedPrice = Math.max(adjustedPrice, 4.0);
       
-      // Convert to API units (multiply by 10)
+      // Convert back to API units (multiply by 10)
       const priceInApiUnits = Math.round(adjustedPrice * 10);
       
       return {
         ...player,
         now_cost: priceInApiUnits,
         custom_price: adjustedPrice,
-        base_price: basePrice
+        original_price: originalPrice
       };
     });
   } catch (error) {
-    console.error('Failed to load custom prices:', error);
+    console.error('Failed to apply custom pricing:', error);
     // Fallback to original prices if custom pricing fails
     return players;
   }
