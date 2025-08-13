@@ -287,7 +287,16 @@ export function EnhancedPlayerSelectionTable({
       
       <CardContent className="p-0">
         <div className="max-h-[600px] overflow-y-auto">
-          <Table>
+          <div className="relative overflow-x-auto">
+            {/* Horizontal scroll indicator for mobile */}
+            <div className="absolute top-1/2 right-2 transform -translate-y-1/2 z-10 pointer-events-none sm:hidden">
+              <div className="flex items-center justify-center w-8 h-8 bg-fpl-green/20 rounded-full animate-pulse">
+                <svg className="w-4 h-4 text-fpl-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+            <Table>
             <TableHeader className="sticky top-0 bg-slate-800/90 backdrop-blur">
               <TableRow className="border-slate-700">
                 <TableHead className="text-white">Player</TableHead>
@@ -417,6 +426,7 @@ export function EnhancedPlayerSelectionTable({
               })}
             </TableBody>
           </Table>
+          </div>
         </div>
         
         {filteredAndSortedPlayers.length === 0 && (
