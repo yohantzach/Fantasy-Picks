@@ -76,6 +76,30 @@
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
   }
   
+  /* Mobile-first responsive utilities */
+  .mobile-form-spacing > * + * {
+    margin-top: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .mobile-form-spacing > * + * {
+      margin-top: 1.25rem;
+    }
+  }
+  
+  /* Better touch targets for mobile */
+  @media (max-width: 767px) {
+    .mobile-touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    /* Improve input field sizing on mobile */
+    input, select, textarea {
+      font-size: 16px !important; /* Prevents zoom on iOS */
+    }
+  }
+  
   .fpl-gradient {
     background: linear-gradient(135deg, hsl(285, 100%, 11%) 0%, hsl(285, 80%, 15%) 50%, hsl(135, 100%, 20%) 100%);
   }

@@ -358,17 +358,17 @@ export default function TeamSelection() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-green">
       <Navigation />
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Create Team</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Create Team</h1>
+          <p className="text-muted-foreground text-sm">
             {currentGameweek ? `Gameweek ${currentGameweek.gameweekNumber}` : "Loading..."}
           </p>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-fpl-green">
+        <div className="text-left sm:text-right">
+          <div className="text-xl sm:text-2xl font-bold text-fpl-green">
             £{(remainingBudget / 10).toFixed(1)}m
           </div>
           <p className="text-sm text-muted-foreground">Budget Remaining</p>
@@ -393,14 +393,14 @@ export default function TeamSelection() {
       )}
 
       {!showPlayerTable ? (
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Formation Pitch */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-2 lg:order-1">
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Formation - Click on positions to select players</CardTitle>
-                  <div className="w-32">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <CardTitle className="text-lg sm:text-xl">Your Team Formation</CardTitle>
+                  <div className="w-full sm:w-32">
                     <Select value={formation} onValueChange={handleFormationChange} disabled={isLocked}>
                       <SelectTrigger>
                         <SelectValue />
@@ -432,10 +432,10 @@ export default function TeamSelection() {
           </div>
 
           {/* Team Overview */}
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6 order-1 lg:order-2">
             <Card>
               <CardHeader>
-                <CardTitle>Your Team</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">Team Overview</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>

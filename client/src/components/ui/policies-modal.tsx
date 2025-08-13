@@ -3,12 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TermsAndConditions } from "@/components/ui/terms-and-conditions";
 import { PrivacyPolicy } from "@/components/ui/privacy-policy";
-import { RefundPolicy } from "@/components/ui/refund-policy";
 import { FileText } from "lucide-react";
 
 interface PoliciesModalProps {
   trigger?: React.ReactNode;
-  defaultTab?: "terms" | "privacy" | "refund";
+  defaultTab?: "terms" | "privacy";
 }
 
 export function PoliciesModal({ trigger, defaultTab = "terms" }: PoliciesModalProps) {
@@ -24,7 +23,7 @@ export function PoliciesModal({ trigger, defaultTab = "terms" }: PoliciesModalPr
       </DialogTrigger>
       <DialogContent className="max-w-5xl max-h-[90vh] bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple border-white/20">
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-white/10 mb-4">
+          <TabsList className="grid w-full grid-cols-2 bg-white/10 mb-4">
             <TabsTrigger 
               value="terms" 
               className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-black"
@@ -37,12 +36,6 @@ export function PoliciesModal({ trigger, defaultTab = "terms" }: PoliciesModalPr
             >
               Privacy Policy
             </TabsTrigger>
-            <TabsTrigger 
-              value="refund" 
-              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-black"
-            >
-              Refund Policy
-            </TabsTrigger>
           </TabsList>
           
           <div className="max-h-[70vh] overflow-y-auto">
@@ -52,10 +45,6 @@ export function PoliciesModal({ trigger, defaultTab = "terms" }: PoliciesModalPr
             
             <TabsContent value="privacy" className="mt-0">
               <PrivacyPolicy />
-            </TabsContent>
-            
-            <TabsContent value="refund" className="mt-0">
-              <RefundPolicy />
             </TabsContent>
           </div>
         </Tabs>

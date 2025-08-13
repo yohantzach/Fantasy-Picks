@@ -312,47 +312,45 @@ export default function RulesPage() {
           </CardContent>
         </Card>
 
-        {/* Additional Information */}
-        <div className="grid md:grid-cols-2 gap-8 mt-8">
-          {/* Player Prices */}
-          <Card className="bg-white/5 border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-400" />
-                Player Prices
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-white/90">
-              <p className="text-sm">
-                Player prices change dynamically to reflect how popular of a pick they are based on a hidden algorithm.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Form & ICT Index */}
-          <Card className="bg-white/5 border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-400" />
-                Form & ICT Index
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-white/90">
+        {/* Form & ICT Index - Full Width */}
+        <Card className="bg-white/5 border-white/20 mt-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2 text-xl">
+              <Target className="h-5 w-5 text-blue-400" />
+              Form & ICT Index
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6 text-white/90">
+            <div className="grid md:grid-cols-2 gap-8">
               <div>
-                <h4 className="font-medium text-white mb-2">Form</h4>
-                <p className="text-sm">
+                <h4 className="font-medium text-white mb-3 text-lg flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  Form
+                </h4>
+                <p className="text-sm leading-relaxed">
                   A player's average score per match, calculated from all matches played by his club in the last 30 days.
                 </p>
               </div>
               <div>
-                <h4 className="font-medium text-white mb-2">ICT Index</h4>
-                <p className="text-sm">
+                <h4 className="font-medium text-white mb-3 text-lg flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  ICT Index
+                </h4>
+                <p className="text-sm leading-relaxed">
                   A football statistical index that assesses a player as an FPL asset using Influence, Creativity and Threat scores.
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <h4 className="text-blue-400 font-medium mb-2">How to Use These Metrics</h4>
+              <div className="text-sm text-white/90 space-y-1">
+                <p>• <strong>Form:</strong> Higher form values indicate players who have been consistently scoring points recently</p>
+                <p>• <strong>ICT Index:</strong> Higher ICT values suggest players who are more likely to be involved in their team's attacking play</p>
+                <p>• Use both metrics together to identify players in good form who are also statistically likely to deliver points</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Bonus Points System Details */}
         <Card className="bg-white/5 border-white/20 mt-8">

@@ -60,21 +60,22 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple flex">
-      {/* Left side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <Card className="w-full max-w-md glass-card border-white/20">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-white">
-              {isLogin ? "Welcome Back" : "Join Fantasy Picks"}
-            </CardTitle>
-            <p className="text-white/70">
-              {isLogin ? "Sign in to manage your team" : "Create your account to start playing"}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
+      <div className="flex flex-col lg:flex-row min-h-screen">
+        {/* Left side - Form */}
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+          <Card className="w-full max-w-md glass-card border-white/20">
+            <CardHeader className="text-center px-4 sm:px-6 py-4 sm:py-6">
+              <CardTitle className="text-xl sm:text-2xl font-bold text-white">
+                {isLogin ? "Welcome Back" : "Join Fantasy Picks"}
+              </CardTitle>
+              <p className="text-sm sm:text-base text-white/70 mt-2">
+                {isLogin ? "Sign in to manage your team" : "Create your account to start playing"}
+              </p>
+            </CardHeader>
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 sm:space-y-6">
             {isLogin ? (
-              <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+              <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4 sm:space-y-5">
                 <div>
                   <Label htmlFor="email" className="text-white">Email</Label>
                   <Input
@@ -285,38 +286,69 @@ export default function AuthPage() {
         </Card>
       </div>
 
-      {/* Right side - Hero */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-fpl-purple to-purple-800">
+      {/* Right side - Hero (hidden on mobile/tablet, visible on desktop) */}
+      <div className="hidden lg:flex flex-1 items-center justify-center p-8 bg-gradient-to-br from-fpl-purple to-purple-800">
         <div className="text-center max-w-lg">
-          <Volleyball className="h-24 w-24 text-fpl-green mx-auto mb-6" />
-          <h1 className="text-4xl font-bold text-white mb-4">
-            Fantasy Premier League
+          <img 
+            src="/fantasy-picks-logo.svg" 
+            alt="Fantasy Picks Logo" 
+            className="h-32 xl:h-40 w-auto mx-auto mb-6"
+          />
+          <h1 className="text-3xl xl:text-4xl font-bold text-white mb-4">
+            Fantasy Picks
           </h1>
-          <h2 className="text-2xl font-semibold text-fpl-green mb-6">
+          <h2 className="text-xl xl:text-2xl font-semibold text-fpl-green mb-6">
             Weekly Competition
           </h2>
-          <div className="space-y-4 text-white/80">
-            <p className="text-lg flex items-center justify-center gap-2">
-              <Trophy className="h-5 w-5 text-fpl-green" />
+          <div className="space-y-3 xl:space-y-4 text-white/80">
+            <p className="text-base xl:text-lg flex items-center justify-center gap-2">
+              <Trophy className="h-4 xl:h-5 w-4 xl:w-5 text-fpl-green" />
               Independent weekly competitions
             </p>
-            <p className="text-lg flex items-center justify-center gap-2">
-              <DollarSign className="h-5 w-5 text-fpl-green" />
+            <p className="text-base xl:text-lg flex items-center justify-center gap-2">
+              <DollarSign className="h-4 xl:h-5 w-4 xl:w-5 text-fpl-green" />
               Fresh 100M budget every gameweek
             </p>
-            <p className="text-lg flex items-center justify-center gap-2">
-              <Target className="h-5 w-5 text-fpl-green" />
+            <p className="text-base xl:text-lg flex items-center justify-center gap-2">
+              <Target className="h-4 xl:h-5 w-4 xl:w-5 text-fpl-green" />
               Win exciting rewards weekly
             </p>
-            <p className="text-lg flex items-center justify-center gap-2">
-              <Zap className="h-5 w-5 text-fpl-green" />
+            <p className="text-base xl:text-lg flex items-center justify-center gap-2">
+              <Zap className="h-4 xl:h-5 w-4 xl:w-5 text-fpl-green" />
               Real-time scoring & leaderboards
             </p>
           </div>
-          <div className="mt-8 p-6 bg-white/10 rounded-lg border border-white/20 backdrop-blur-sm">
+          <div className="mt-6 xl:mt-8 p-4 xl:p-6 bg-white/10 rounded-lg border border-white/20 backdrop-blur-sm">
             <p className="text-sm text-white/70 mb-2">Contest Prize</p>
-            <p className="text-4xl font-bold text-fpl-green">₹10,000</p>
+            <p className="text-3xl xl:text-4xl font-bold text-fpl-green">₹10,000</p>
             <p className="text-sm text-white/70">to be won in the contest</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Hero Section - Compact version shown at bottom on mobile */}
+      <div className="lg:hidden bg-gradient-to-r from-fpl-purple to-purple-800 px-4 py-6">
+        <div className="text-center max-w-sm mx-auto">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <img 
+              src="/fantasy-picks-logo.svg" 
+              alt="Fantasy Picks Logo" 
+              className="h-12 w-auto"
+            />
+            <div>
+              <h2 className="text-lg font-bold text-white">Fantasy Picks</h2>
+              <p className="text-sm text-fpl-green font-semibold">Weekly Competition</p>
+            </div>
+          </div>
+          <div className="flex justify-center items-center gap-4 text-xs text-white/80 mb-4">
+            <span className="flex items-center gap-1">
+              <Trophy className="h-3 w-3 text-fpl-green" />
+              Weekly contests
+            </span>
+            <span className="flex items-center gap-1">
+              <DollarSign className="h-3 w-3 text-fpl-green" />
+              ₹10,000 prize
+            </span>
           </div>
         </div>
       </div>

@@ -1,0 +1,36 @@
+<svg width="400" height="300" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main logo container with border -->
+  <rect x="20" y="40" width="360" height="220" rx="20" ry="20" fill="none" stroke="#00ff87" stroke-width="6"/>
+  
+  <!-- Soccer ball -->
+  <g transform="translate(40, 60)">
+    <!-- Ball circle -->
+    <circle cx="40" cy="40" r="35" fill="#00ff87" stroke="#00ff87" stroke-width="2"/>
+    <!-- Hexagon pattern -->
+    <g fill="#481c77">
+      <!-- Center hexagon -->
+      <polygon points="40,25 50,32 50,48 40,55 30,48 30,32"/>
+      <!-- Top pentagon -->
+      <polygon points="40,25 30,32 35,20 45,20 50,32"/>
+      <!-- Side pentagons -->
+      <polygon points="30,32 20,35 15,45 25,50 30,48"/>
+      <polygon points="50,32 60,35 65,45 55,50 50,48"/>
+      <!-- Bottom pentagon -->
+      <polygon points="40,55 30,48 35,60 45,60 50,48"/>
+    </g>
+  </g>
+  
+  <!-- FANTASY text -->
+  <g fill="#00ff87" font-family="Arial Black, Arial" font-weight="900" font-size="42">
+    <text x="110" y="110" letter-spacing="2px">FANTASY</text>
+  </g>
+  
+  <!-- PICKS text -->
+  <g fill="#00ff87" font-family="Arial Black, Arial" font-weight="900" font-size="60">
+    <text x="110" y="180" letter-spacing="3px">PICKS</text>
+  </g>
+  
+  <!-- Decorative lines -->
+  <line x1="110" y1="120" x2="360" y2="120" stroke="#00ff87" stroke-width="2"/>
+  <line x1="110" y1="200" x2="360" y2="200" stroke="#00ff87" stroke-width="2"/>
+</svg>
