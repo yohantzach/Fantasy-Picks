@@ -230,7 +230,7 @@ export default function TeamsPage() {
                         </div>
                         <div className="text-center">
                           <p className="text-white/60 text-xs">Value</p>
-                          <p className="text-white font-medium">£{team.totalValue?.toFixed(1) || '0.0'}m</p>
+                          <p className="text-white font-medium">£{(parseFloat(team.totalValue?.toString() || '0')).toFixed(1)}m</p>
                         </div>
                       </div>
                       

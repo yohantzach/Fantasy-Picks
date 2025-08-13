@@ -21,11 +21,18 @@ export function FormationPitch({
   viceCaptainId,
   formation = "4-4-2" 
 }: FormationPitchProps) {
+  
   const getPlayersByPosition = (elementType: number) => {
-    return selectedPlayers
-      .map(id => players.find(p => p.id === id))
+    const mappedPlayers = selectedPlayers.map(id => {
+      const found = players.find(p => p.id === id);
+      return found;
+    });
+    
+    const filteredByPosition = mappedPlayers
       .filter(p => p && p.element_type === elementType)
       .filter(Boolean) as FPLPlayer[];
+    
+    return filteredByPosition;
   };
 
   const getPositionLabel = (elementType: number) => {

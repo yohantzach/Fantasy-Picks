@@ -89,15 +89,7 @@ export default function TeamSelection() {
     queryKey: ["/api/fpl/teams"],
   });
 
-  // Load current team data when available
-  useMemo(() => {
-    if (currentTeam?.players) {
-      setSelectedPlayers(currentTeam.players);
-      setTeamName(currentTeam.teamName || "");
-      setCaptainId(currentTeam.captainId || null);
-      setViceCaptainId(currentTeam.viceCaptainId || null);
-    }
-  }, [currentTeam]);
+  // NOTE: Team creation should start fresh - no auto-loading of existing team data
 
   const handlePositionClick = (elementType: number) => {
     setShowPlayerTable(elementType);

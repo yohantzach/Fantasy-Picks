@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Save, Users, DollarSign, Trophy, AlertCircle, Edit3, ArrowLeft, Lock, CheckCircle2, XCircle, Timer } from "lucide-react";
+import { Clock, Save, Users, DollarSign, Trophy, AlertCircle, Edit3, ArrowLeft, Lock, CheckCircle2, XCircle, Timer, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { FormationPitch } from "@/components/formation-pitch";
 import { EnhancedPlayerSelectionTable } from "@/components/enhanced-player-selection-table";
@@ -19,6 +19,7 @@ import { Link } from "wouter";
 export default function EditTeam() {
   const { toast } = useToast();
   const [selectedPlayers, setSelectedPlayers] = useState<any[]>([]);
+  
   const [teamName, setTeamName] = useState("");
   const [captainId, setCaptainId] = useState<number | null>(null);
   const [viceCaptainId, setViceCaptainId] = useState<number | null>(null);
@@ -78,22 +79,56 @@ export default function EditTeam() {
     queryKey: ["/api/fpl/teams"],
   });
 
-  // Load current team data when available
+  // Load current team data when both team and player data are available
   useEffect(() => {
-    if (currentTeam?.players) {
-      setSelectedPlayers(currentTeam.players);
-      setTeamName(currentTeam.teamName || "");
-      setCaptainId(currentTeam.captainId || null);
-      setViceCaptainId(currentTeam.viceCaptainId || null);
-      setIsModified(false);
+    if (currentTeam && players.length > 0) {
+      // Backend sends players as array of player IDs directly
+      if (currentTeam.players && Array.isArray(currentTeam.players) && currentTeam.players.length > 0) {
+        // currentTeam.players is already an array of player IDs (numbers)
+        const playerIds = currentTeam.players.map((id: any) => parseInt(id.toString())).filter(id => !isNaN(id));
+        
+        // Validate that these player IDs exist in our FPL players data
+        const validPlayerIds = playerIds.filter((id: number) => 
+          players.some((p: any) => p.id === id)
+        );
+        
+        if (validPlayerIds.length > 0) {
+          setSelectedPlayers(validPlayerIds);
+          setTeamName(currentTeam.teamName || "");
+          setCaptainId(currentTeam.captainId || null);
+          setViceCaptainId(currentTeam.viceCaptainId || null);
+          setIsModified(false);
+          
+          // Show success toast
+          const selectedPlayerObjs = players.filter((p: any) => validPlayerIds.includes(p.id));
+          const teamValue = selectedPlayerObjs.reduce((sum: number, p: any) => sum + p.now_cost, 0);
+          
+          toast({
+            title: "Team Loaded",
+            description: `${validPlayerIds.length} players loaded • £${(teamValue / 10).toFixed(1)}m value`,
+          });
+        }
+      } else {
+        // Team exists but no players - initialize empty
+        setSelectedPlayers([]);
+        setTeamName(currentTeam.teamName || "");
+        setCaptainId(null);
+        setViceCaptainId(null);
+        setIsModified(false);
+      }
     }
-  }, [currentTeam]);
+  }, [currentTeam, players, toast]);
 
   // Track modifications
   useEffect(() => {
     if (currentTeam) {
+      // Get original player IDs for comparison
+      const originalPlayerIds = Array.isArray(currentTeam.players) 
+        ? currentTeam.players.map(p => typeof p === 'object' ? p.fplPlayerId : p)
+        : [];
+        
       const hasChanges = 
-        JSON.stringify(selectedPlayers.sort()) !== JSON.stringify((currentTeam.players || []).sort()) ||
+        JSON.stringify(selectedPlayers.sort()) !== JSON.stringify(originalPlayerIds.sort()) ||
         teamName !== (currentTeam.teamName || "") ||
         captainId !== (currentTeam.captainId || null) ||
         viceCaptainId !== (currentTeam.viceCaptainId || null);
@@ -420,46 +455,23 @@ export default function EditTeam() {
           </Card>
         )}
 
-        {/* Debug Information */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="bg-yellow-500/10 border-yellow-500/20 mb-6">
-            <CardContent className="p-4">
-              <div className="text-yellow-300 text-sm">
-                <p><strong>Debug Info:</strong></p>
-                <p>User Teams Length: {userTeams.length}</p>
-                <p>Sorted Teams Length: {sortedTeams.length}</p>
-                <p>Current Team Number: {currentTeamNumber}</p>
-                <p>Current Team Data: {currentTeamData ? 'Found' : 'Not Found'}</p>
-                <p>Current Team: {currentTeam ? 'Loaded' : 'Not Loaded'}</p>
-                <p>Teams Loading: {teamsLoading ? 'Yes' : 'No'}</p>
-                <p>Team Loading: {teamLoading ? 'Yes' : 'No'}</p>
-                {userTeams.length > 0 && (
-                  <p>First Team: {JSON.stringify(userTeams[0], null, 2)}</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Multi-Team Tabs Interface */}
+        {/* Clean Team Selection Interface */}
         {(teamsLoading || teamLoading) ? (
-          <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-6 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fpl-green mx-auto mb-4"></div>
-              <p className="text-white/70">Loading your teams...</p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fpl-green"></div>
+            <p className="text-white/70 ml-4">Loading your teams...</p>
+          </div>
         ) : sortedTeams.length > 0 ? (
-          <Card className="bg-white/5 border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Users className="h-5 w-5" />
+          <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-xl font-bold flex items-center gap-2">
+                <Users className="h-5 w-5 text-fpl-green" />
                 Your Teams ({sortedTeams.length}/5)
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <Tabs value={activeTeamTab} onValueChange={handleTabChange} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-4">
+                <TabsList className="grid w-full grid-cols-5 bg-white/10 border border-white/20">
                   {[1, 2, 3, 4, 5].map(teamNum => {
                     const team = sortedTeams.find(t => t.teamNumber === teamNum);
                     const isDisabled = !team;
@@ -470,22 +482,19 @@ export default function EditTeam() {
                         key={teamNum} 
                         value={teamNum.toString()} 
                         disabled={isDisabled}
-                        className={`flex flex-col gap-1 p-3 ${
-                          isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                        } ${
-                          paymentStatus === 'approved' ? 'bg-green-500/20 border-green-500' :
-                          paymentStatus === 'pending' ? 'bg-yellow-500/20 border-yellow-500' :
-                          paymentStatus === 'rejected' ? 'bg-red-500/20 border-red-500' :
-                          'bg-gray-500/20 border-gray-500'
-                        }`}
+                        className={`relative transition-all duration-200 ${
+                          isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/20'
+                        } data-[state=active]:bg-fpl-green data-[state=active]:text-white`}
                       >
-                        <span className="font-medium">Team {teamNum}</span>
-                        <div className="flex items-center gap-1">
-                          {team ? getPaymentStatusBadge(paymentStatus) : (
-                            <Badge variant="outline" className="text-xs">
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                              Not Created
-                            </Badge>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="font-semibold text-sm">Team {teamNum}</span>
+                          {team && (
+                            <div className={`w-2 h-2 rounded-full ${
+                              paymentStatus === 'approved' ? 'bg-green-400' :
+                              paymentStatus === 'pending' ? 'bg-yellow-400' :
+                              paymentStatus === 'rejected' ? 'bg-red-400' :
+                              'bg-gray-400'
+                            }`} />
                           )}
                         </div>
                       </TabsTrigger>
@@ -493,118 +502,90 @@ export default function EditTeam() {
                   })}
                 </TabsList>
                 
-                {/* Tab Content for each team */}
+                {/* Clean Tab Content */}
                 {[1, 2, 3, 4, 5].map(teamNum => {
                   const team = sortedTeams.find(t => t.teamNumber === teamNum);
-                  const isCurrentTab = teamNum.toString() === activeTeamTab;
                   
                   return (
-                    <TabsContent key={teamNum} value={teamNum.toString()} className="mt-4">
+                    <TabsContent key={teamNum} value={teamNum.toString()} className="mt-6">
                       {team ? (
-                        <div className="space-y-4">
-                          {/* Team Status Info */}
-                          <div className="flex items-center justify-between p-4 bg-white/10 rounded-lg">
-                            <div>
-                              <h3 className="font-semibold text-white">Team {teamNum}: {team.teamName || 'Unnamed Team'}</h3>
-                              <p className="text-sm text-white/70">
-                                Payment Status: {getPaymentStatusBadge(team.paymentStatus)}
-                              </p>
-                              <p className="text-xs text-white/50">
-                                Players: {Array.isArray(team.players) ? team.players.length : 0}/11 • 
-                                Can Edit: {team.canEdit ? 'Yes' : 'No'}
-                              </p>
+                        <div className="space-y-6">
+                          {/* Clean Team Status Card */}
+                          <div className={`p-6 rounded-xl border-2 transition-all ${
+                            team.paymentStatus === 'approved' 
+                              ? 'bg-green-500/10 border-green-500/30 shadow-lg shadow-green-500/20'
+                              : team.paymentStatus === 'pending'
+                              ? 'bg-yellow-500/10 border-yellow-500/30 shadow-lg shadow-yellow-500/20'
+                              : team.paymentStatus === 'rejected'
+                              ? 'bg-red-500/10 border-red-500/30 shadow-lg shadow-red-500/20'
+                              : 'bg-white/5 border-white/20'
+                          }`}>
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <h3 className="text-xl font-bold text-white mb-1">
+                                  {team.teamName || `Team ${teamNum}`}
+                                </h3>
+                                <div className="flex items-center gap-3 text-sm text-white/70">
+                                  <span>Players: {Array.isArray(team.players) ? team.players.length : 0}/11</span>
+                                  <span>•</span>
+                                  <span>Value: £{(parseFloat(team.totalValue?.toString() || '0')).toFixed(1)}m</span>
+                                  <span>•</span>
+                                  <span>Points: {team.totalPoints || 0}</span>
+                                </div>
+                              </div>
+                              {getPaymentStatusBadge(team.paymentStatus)}
                             </div>
-                            <div className="text-right">
-                              {team.paymentStatus === 'approved' ? (
-                                <Badge className="bg-green-500 hover:bg-green-600">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Editable
-                                </Badge>
-                              ) : team.paymentStatus === 'pending' ? (
-                                <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                                  <Timer className="h-3 w-3 mr-1" />
-                                  Awaiting Approval
-                                </Badge>
-                              ) : team.paymentStatus === 'rejected' ? (
-                                <Badge className="bg-red-500 hover:bg-red-600">
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Payment Rejected
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">
-                                  <AlertCircle className="h-3 w-3 mr-1" />
-                                  Payment Required
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Action buttons based on payment status */}
-                          <div className="flex gap-2">
+                            
+                            {/* Status-specific content */}
                             {team.paymentStatus === 'approved' ? (
-                              <p className="text-green-400 text-sm flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4" />
-                                This team is ready for editing! Use the form below to make changes.
-                              </p>
+                              <div className="flex items-center gap-2 text-green-400">
+                                <CheckCircle2 className="h-5 w-5" />
+                                <span className="font-medium">Team is ready for editing</span>
+                              </div>
                             ) : team.paymentStatus === 'pending' ? (
-                              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 w-full">
-                                <p className="text-yellow-400 text-sm flex items-center gap-2 font-medium mb-2">
-                                  <Timer className="h-4 w-4" />
-                                  TEAM NOT YET APPROVED
-                                </p>
-                                <p className="text-yellow-300 text-sm">
-                                  Your payment is pending admin approval. The team exists but cannot be edited until payment is approved.
-                                </p>
+                              <div className="flex items-center gap-2 text-yellow-400">
+                                <Timer className="h-5 w-5" />
+                                <span className="font-medium">Payment pending approval</span>
                               </div>
                             ) : team.paymentStatus === 'rejected' ? (
-                              <div className="flex items-center gap-2 w-full">
-                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex-1">
-                                  <p className="text-red-400 text-sm flex items-center gap-2 font-medium mb-2">
-                                    <XCircle className="h-4 w-4" />
-                                    PAYMENT REJECTED
-                                  </p>
-                                  <p className="text-red-300 text-sm mb-2">
-                                    Your payment was rejected. Please resubmit payment to make this team editable.
-                                  </p>
-                                  <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
-                                    <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                                      Resubmit Payment
-                                    </Button>
-                                  </Link>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-red-400">
+                                  <XCircle className="h-5 w-5" />
+                                  <span className="font-medium">Payment rejected - resubmit required</span>
                                 </div>
+                                <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
+                                  <Button size="sm" className="bg-red-600 hover:bg-red-700">
+                                    Resubmit Payment
+                                  </Button>
+                                </Link>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-2 w-full">
-                                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex-1">
-                                  <p className="text-orange-400 text-sm flex items-center gap-2 font-medium mb-2">
-                                    <AlertCircle className="h-4 w-4" />
-                                    PAYMENT REQUIRED
-                                  </p>
-                                  <p className="text-orange-300 text-sm mb-2">
-                                    Complete payment to make this team editable.
-                                  </p>
-                                  <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
-                                    <Button size="sm" className="bg-fpl-green hover:bg-green-600">
-                                      Complete Payment
-                                    </Button>
-                                  </Link>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-orange-400">
+                                  <AlertCircle className="h-5 w-5" />
+                                  <span className="font-medium">Payment required</span>
                                 </div>
+                                <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
+                                  <Button size="sm" className="bg-fpl-green hover:bg-green-600">
+                                    Complete Payment
+                                  </Button>
+                                </Link>
                               </div>
                             )}
                           </div>
                         </div>
                       ) : (
-                        <div className="text-center p-8 bg-white/5 rounded-lg">
-                          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-semibold text-white mb-2">
-                            Team {teamNum} Not Created
+                        <div className="text-center p-12 bg-white/5 rounded-xl border-2 border-dashed border-white/20">
+                          <Trophy className="h-16 w-16 text-white/40 mx-auto mb-4" />
+                          <h3 className="text-xl font-bold text-white mb-2">
+                            Team {teamNum} Available
                           </h3>
-                          <p className="text-white/70 mb-4">
-                            Create Team {teamNum} to expand your fantasy football strategy.
+                          <p className="text-white/60 mb-6">
+                            Create Team {teamNum} to expand your fantasy strategy
                           </p>
                           <Link href={`/?team=${teamNum}`}>
-                            <Button className="bg-fpl-green hover:bg-green-600">
-                              <Trophy className="h-4 w-4 mr-2" />
+                            <Button className="bg-fpl-green hover:bg-green-600 px-6 py-3">
+                              <Plus className="h-4 w-4 mr-2" />
                               Create Team {teamNum}
                             </Button>
                           </Link>
@@ -656,7 +637,7 @@ export default function EditTeam() {
           </Card>
         )}
 
-        {hasEditAccess && currentTeam && !showPlayerTable ? (
+        {currentTeam && !showPlayerTable ? (
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Formation Pitch */}
             <div className="lg:col-span-2">
@@ -665,9 +646,9 @@ export default function EditTeam() {
                   <CardTitle>Your Team Formation - Click positions to {isLocked ? 'view' : 'edit'} players</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <FormationPitch 
-                    selectedPlayers={selectedPlayers}
+                  <FormationPitch
                     players={players}
+                    selectedPlayers={selectedPlayers}
                     onPositionClick={handlePositionClick}
                     captainId={captainId}
                     viceCaptainId={viceCaptainId}
@@ -682,14 +663,19 @@ export default function EditTeam() {
                 <CardHeader>
                   <CardTitle>Team Details</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Input
-                      placeholder="Enter team name"
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                      disabled={isLocked}
-                    />
+                <CardContent className="space-y-6">
+                  {/* Team Name - Always Locked for Approved Teams */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-white">{currentTeam?.teamName || 'Team Name'}</h3>
+                      <Badge variant="secondary" className="text-xs bg-white/10">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Fixed
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-white/60">
+                      Team name is fixed after payment approval. You can modify players, captain, and vice-captain.
+                    </p>
                   </div>
 
                   <div className="space-y-2">

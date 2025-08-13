@@ -44,11 +44,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start FPL scoring service
   fplScoringService.startAutoScoring();
   
-  // Register team management routes
-  app.use("/api/teams", teamsRouter);
+  // Register specific /api/teams/user route before the generic teams router
+  // This must come BEFORE the teams router to prevent conflicts
+  
+  // Get all user teams for current gameweek
+  app.get("/api/teams/user", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      console.log("❌ [TEAMS/USER] User not authenticated");
+      return res.sendStatus(401);
+    }
+    
+    try {
+      const currentGameweek = await storage.getCurrentGameweek();
+      console.log("🔍 [TEAMS/USER] Current gameweek:", currentGameweek);
+      
+      if (!currentGameweek) {
+        console.log("❌ [TEAMS/USER] No active gameweek found");
+        return res.status(404).json({ error: "No active gameweek" });
+      }
+      
+      const userId = req.user!.id;
+      console.log("🔍 [TEAMS/USER] User ID:", userId, "Gameweek ID:", currentGameweek.id);
+      
+      const userTeams = await storage.getUserTeamsForGameweek(userId, currentGameweek.id);
+      console.log("🔍 [TEAMS/USER] Raw user teams from storage:", JSON.stringify(userTeams, null, 2));
+      
+      if (userTeams.length === 0) {
+        console.log("⚠️ [TEAMS/USER] No teams found for user", userId, "in gameweek", currentGameweek.id);
+        console.log("⚠️ [TEAMS/USER] Returning empty array");
+        return res.json([]);
+      }
+      
+      // Get payment status for each team
+      const teamsWithPaymentStatus = await Promise.all(
+        userTeams.map(async (team) => {
+          console.log("🔍 [TEAMS/USER] Processing team:", team.id, "team number:", team.teamNumber);
+          
+          const paymentStatus = await db
+            .select()
+            .from(paymentProofs)
+            .where(
+              and(
+                eq(paymentProofs.userId, userId),
+                eq(paymentProofs.gameweekId, currentGameweek.id),
+                eq(paymentProofs.teamNumber, team.teamNumber)
+              )
+            )
+            .orderBy(paymentProofs.submittedAt)
+            .limit(1);
+          
+          console.log("🔍 [TEAMS/USER] Payment status query result:", paymentStatus);
+          
+          const payment = paymentStatus[0];
+          const teamWithStatus = {
+            ...team,
+            paymentStatus: payment?.status || 'not_submitted',
+            canEdit: payment?.status === 'approved' && new Date() <= currentGameweek.deadline,
+            pendingPayment: payment?.status === 'pending'
+          };
+          
+          console.log("🔍 [TEAMS/USER] Final team with status:", JSON.stringify(teamWithStatus, null, 2));
+          return teamWithStatus;
+        })
+      );
+      
+      console.log("✅ [TEAMS/USER] Final response:", JSON.stringify(teamsWithPaymentStatus, null, 2));
+      res.json(teamsWithPaymentStatus);
+    } catch (error) {
+      console.error("❌ [TEAMS/USER] Error fetching user teams:", error);
+      console.error("❌ [TEAMS/USER] Stack trace:", error instanceof Error ? error.stack : error);
+      res.status(500).json({ error: "Failed to fetch teams" });
+    }
+  });
   
   // Register payment routes for manual payment system
   app.use("/api/payment", paymentRouter);
+  
+  // Register team management routes (this will handle /api/teams/:id and other team routes)
+  app.use("/api/teams", teamsRouter);
   
 
   // Hybrid FPL Data endpoints with automatic fallback between FPL API and API-Football
@@ -658,61 +731,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .limit(1);
       
-      const players = await storage.getTeamPlayers(team.id);
+      // Return the player IDs directly from the team.players field
       res.json({ 
         ...team, 
-        players,
+        players: team.players || [], // This is already an array of player IDs
         canEdit: paymentStatus.length > 0 && new Date() <= currentGameweek.deadline,
         paymentStatus: paymentStatus.length > 0 ? 'approved' : 'pending'
       });
     } catch (error) {
       console.error("Error fetching user team:", error);
       res.status(500).json({ error: "Failed to fetch team" });
-    }
-  });
-  
-  // Get all user teams for current gameweek
-  app.get("/api/teams/user", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
-    try {
-      const currentGameweek = await storage.getCurrentGameweek();
-      if (!currentGameweek) {
-        return res.status(404).json({ error: "No active gameweek" });
-      }
-      
-      const userTeams = await storage.getUserTeamsForGameweek(req.user!.id, currentGameweek.id);
-      
-      // Get payment status for each team
-      const teamsWithPaymentStatus = await Promise.all(
-        userTeams.map(async (team) => {
-          const paymentStatus = await db
-            .select()
-            .from(paymentProofs)
-            .where(
-              and(
-                eq(paymentProofs.userId, req.user!.id),
-                eq(paymentProofs.gameweekId, currentGameweek.id),
-                eq(paymentProofs.teamNumber, team.teamNumber)
-              )
-            )
-            .orderBy(paymentProofs.submittedAt)
-            .limit(1);
-          
-          const payment = paymentStatus[0];
-          return {
-            ...team,
-            paymentStatus: payment?.status || 'not_submitted',
-            canEdit: payment?.status === 'approved' && new Date() <= currentGameweek.deadline,
-            pendingPayment: payment?.status === 'pending'
-          };
-        })
-      );
-      
-      res.json(teamsWithPaymentStatus);
-    } catch (error) {
-      console.error("Error fetching user teams:", error);
-      res.status(500).json({ error: "Failed to fetch teams" });
     }
   });
   
@@ -756,10 +784,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .limit(1);
       
-      const players = await storage.getTeamPlayers(team[0].id);
+      // Return the player IDs directly from the team.players field
       res.json({ 
         ...team[0], 
-        players,
+        players: team[0].players || [], // This is already an array of player IDs
         canEdit: paymentStatus.length > 0 && paymentStatus[0].status === 'approved' && new Date() <= currentGameweek.deadline,
         paymentStatus: paymentStatus.length > 0 ? paymentStatus[0].status : 'not_submitted'
       });
