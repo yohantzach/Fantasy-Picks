@@ -62,13 +62,15 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
       <div className="flex flex-col lg:flex-row min-h-screen">
-        {/* Mobile Logo - Shows at top on mobile only */}
-        <div className="lg:hidden flex justify-center pt-8 pb-4">
+        {/* Mobile Logo and Title - Shows at top on mobile only */}
+        <div className="lg:hidden text-center pt-8 pb-6">
           <img 
             src="/fantasy_logo.jpg" 
             alt="Fantasy Picks Logo" 
-            className="h-16 sm:h-20 w-auto"
+            className="h-16 sm:h-20 w-auto mx-auto mb-4"
           />
+          <h1 className="text-2xl font-bold text-white mb-1">Fantasy Picks</h1>
+          <p className="text-lg text-fpl-green font-semibold">Weekly Competition</p>
         </div>
         
         {/* Left side - Form */}
@@ -292,6 +294,34 @@ export default function AuthPage() {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Mobile Features Section - Shows after login form on mobile only */}
+          <div className="lg:hidden mt-8 max-w-md mx-auto px-4">
+            <div className="space-y-4 text-white/80 mb-6">
+              <p className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-fpl-green flex-shrink-0" />
+                <span>Independent weekly competitions</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-fpl-green flex-shrink-0" />
+                <span>Fresh 100M budget every gameweek</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-fpl-green flex-shrink-0" />
+                <span>Win exciting rewards weekly</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-fpl-green flex-shrink-0" />
+                <span>Real-time scoring & leaderboards</span>
+              </p>
+            </div>
+            
+            <div className="p-4 bg-white/10 rounded-lg border border-white/20 backdrop-blur-sm text-center">
+              <p className="text-sm text-white/70 mb-2">Contest Prize</p>
+              <p className="text-3xl font-bold text-fpl-green">₹10,000</p>
+              <p className="text-sm text-white/70">to be won in the contest</p>
+            </div>
+          </div>
         </div>
   
         {/* Right side - Hero (hidden on mobile/tablet, visible on desktop) */}
@@ -334,32 +364,6 @@ export default function AuthPage() {
           </div>
         </div>
   
-        {/* Mobile Hero Section - Compact version shown at bottom on mobile */}
-        <div className="lg:hidden bg-gradient-to-r from-fpl-purple to-purple-800 px-4 py-6">
-          <div className="text-center max-w-sm mx-auto">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <img 
-                src="/fantasy_logo.jpg" 
-                alt="Fantasy Picks Logo" 
-                className="h-12 w-auto"
-              />
-              <div>
-                <h2 className="text-lg font-bold text-white">Fantasy Picks</h2>
-                <p className="text-sm text-fpl-green font-semibold">Weekly Competition</p>
-              </div>
-            </div>
-            <div className="flex justify-center items-center gap-4 text-xs text-white/80 mb-4">
-              <span className="flex items-center gap-1">
-                <Trophy className="h-3 w-3 text-fpl-green" />
-                Weekly contests
-              </span>
-              <span className="flex items-center gap-1">
-                <DollarSign className="h-3 w-3 text-fpl-green" />
-                ₹10,000 prize
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
