@@ -73,7 +73,7 @@ export default function AuthPage() {
                 {isLogin ? "Sign in to manage your team" : "Create your account to start playing"}
               </p>
             </CardHeader>
-          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 sm:space-y-6">
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 sm:space-y-6">
             {isLogin ? (
               <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4 sm:space-y-5">
                 <div>
