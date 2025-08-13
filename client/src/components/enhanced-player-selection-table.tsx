@@ -275,13 +275,12 @@ export function EnhancedPlayerSelectionTable({
           </Button>
           
           <Button
-            variant={sortBy === "selected" ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => handleSort("selected")}
-            className={`${sortBy === "selected" ? "bg-fpl-green text-white border-fpl-green" : "bg-white/20 border-white/30 text-white hover:bg-white/30"}`}
+            className="bg-white/20 border-white/30 text-white cursor-default opacity-75"
+            disabled
           >
             Selected %
-            <SortIcon column="selected" />
           </Button>
         </div>
       </CardHeader>
