@@ -743,14 +743,16 @@ export default function EditTeam() {
 
         {/* Show editing interface for approved teams */}
         {currentTeamData && currentTeamData.paymentStatus === 'approved' && !showPlayerTable ? (
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Formation Pitch */}
+          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6">
+            {/* Formation Pitch - Full width on mobile */}
             <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Team Formation - Click positions to {isLocked ? 'view' : 'edit'} players</CardTitle>
+              <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+                <CardHeader className="pb-3 lg:pb-6">
+                  <CardTitle className="text-white text-lg lg:text-xl">
+                    Your Team Formation - Click positions to {isLocked ? 'view' : 'edit'} players
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-4 lg:px-6">
                   <FormationPitch
                     players={players}
                     selectedPlayers={selectedPlayers}
