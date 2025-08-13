@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
@@ -17,11 +17,22 @@ import ProfilePage from "@/pages/profile-page";
 import ManualPaymentPage from "@/pages/manual-payment-page";
 import AdminPaymentPanel from "@/pages/admin-payment-panel";
 import RulesPage from "@/pages/rules-page";
+import { Redirect } from "wouter";
+
+function AdminRedirect() {
+  const { user } = useAuth();
+  
+  if (user?.isAdmin) {
+    return <Redirect to="/admin" />;
+  }
+  
+  return <TeamSelection />;
+}
 
 function Router() {
   return (
     <Switch>
-      <ProtectedRoute path="/" component={TeamSelection} />
+      <ProtectedRoute path="/" component={AdminRedirect} />
       <ProtectedRoute path="/edit-team" component={EditTeam} />
       <ProtectedRoute path="/teams" component={Teams} />
       <ProtectedRoute path="/leaderboard" component={Leaderboard} />

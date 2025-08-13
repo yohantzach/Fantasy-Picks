@@ -247,13 +247,19 @@ export default function TeamSelection() {
       return response.json();
     },
     onSuccess: (data: any) => {
+      console.log("Team save response:", data);
       if (data.requiresPayment) {
         toast({
           title: "Team Validated! 🎉",
           description: "Redirecting to payment to complete your team registration...",
         });
         // Redirect to payment page with UPI details and team number
-        window.location.href = data.redirectTo;
+        console.log("Redirecting to:", data.redirectTo);
+        
+        // Add a small delay to make the toast visible
+        setTimeout(() => {
+          window.location.href = data.redirectTo;
+        }, 1500); // 1.5 second delay
       } else {
         toast({
           title: "Team Saved Successfully! 🎉",
@@ -300,33 +306,7 @@ export default function TeamSelection() {
       return;
     }
 
-    // For new teams, redirect directly to payment
-    if (!currentTeam || currentTeam.paymentStatus !== 'approved') {
-      // Store team data in session and redirect to payment
-      const existingTeams = currentGameweek ? [] : []; // Will be calculated server-side
-      const nextTeamNumber = currentTeam?.teamNumber || 1;
-      
-      toast({
-        title: "Team Validated! 🎉",
-        description: "Redirecting to payment to complete your team registration...",
-      });
-      
-      // Redirect to payment page with team data
-      const params = new URLSearchParams({
-        gameweek: currentGameweek?.id.toString() || '1',
-        team: nextTeamNumber.toString(),
-        teamName: teamName.trim(),
-        formation: "4-4-2",
-        players: JSON.stringify(selectedPlayers),
-        captainId: captainId?.toString() || '',
-        viceCaptainId: viceCaptainId?.toString() || ''
-      });
-      
-      window.location.href = `/manual-payment?${params.toString()}`;
-      return;
-    }
-
-    // For existing paid teams, save normally
+    // **CRITICAL FIX: Always save team to DB first via API, then handle payment redirect**
     const teamData = {
       teamName: teamName.trim(),
       formation: "4-4-2",

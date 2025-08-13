@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +55,18 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  // Removed editing functionality - profile is now view-only
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ name: "", phone: "" });
+  
+  // Initialize edit data when user data is available
+  React.useEffect(() => {
+    if (user) {
+      setEditData({
+        name: user.name || "",
+        phone: user.phone || ""
+      });
+    }
+  }, [user]);
 
   // Redirect if not logged in
   if (!user) {
@@ -169,31 +180,31 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
       <Navigation />
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4 flex items-center gap-3">
-            <User className="h-10 w-10 text-fpl-green" />
-            My Profile
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <User className="h-8 w-8 sm:h-10 sm:w-10 text-fpl-green" />
+            <span>My Profile</span>
           </h1>
-          <p className="text-white/70 text-lg">
+          <p className="text-white/70 text-base sm:text-lg">
             Manage your account, view your fantasy football journey
           </p>
         </div>
 
         {/* Profile Summary Card */}
-        <Card className="bg-white/5 border-white/20 mb-8">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row md:items-center gap-6">
+        <Card className="bg-white/5 border-white/20 mb-6 sm:mb-8">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
               <div className="flex-1">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-16 h-16 bg-fpl-green rounded-full flex items-center justify-center">
-                    <User className="h-8 w-8 text-white" />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-fpl-green rounded-full flex items-center justify-center">
+                    <User className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">{user.name}</h2>
-                    <p className="text-white/70">{user.email}</p>
-                    <p className="text-white/70">{user.phone}</p>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white">{user.name}</h2>
+                    <p className="text-white/70 text-sm sm:text-base">{user.email}</p>
+                    <p className="text-white/70 text-sm sm:text-base">{user.phone || 'No phone number'}</p>
                   </div>
                 </div>
                 
@@ -226,27 +237,27 @@ export default function ProfilePage() {
 
         {/* Tabs */}
         <Tabs defaultValue="history" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-white/10 mb-6">
+          <TabsList className="grid w-full grid-cols-3 bg-white/10 mb-4 sm:mb-6 h-auto">
             <TabsTrigger 
               value="history" 
-              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-white/70 text-xs sm:text-sm py-2 sm:py-3"
             >
-              <History className="h-4 w-4 mr-2" />
-              Gameweek History
+              <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Gameweek </span>History
             </TabsTrigger>
             <TabsTrigger 
               value="payments" 
-              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-white/70 text-xs sm:text-sm py-2 sm:py-3"
             >
-              <CreditCard className="h-4 w-4 mr-2" />
+              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               Payments
             </TabsTrigger>
             <TabsTrigger 
               value="settings" 
-              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-fpl-green data-[state=active]:text-white text-white/70 text-xs sm:text-sm py-2 sm:py-3"
             >
-              <Shield className="h-4 w-4 mr-2" />
-              Account Settings
+              <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Account </span>Settings
             </TabsTrigger>
           </TabsList>
 
@@ -275,26 +286,26 @@ export default function ProfilePage() {
                     {gameweekHistory.map((gw: GameweekHistory) => (
                       <div
                         key={gw.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10"
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-4">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-fpl-green">GW{gw.gameweekNumber}</div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                            <div className="text-center sm:text-left">
+                              <div className="text-lg sm:text-2xl font-bold text-fpl-green">GW{gw.gameweekNumber}</div>
                               <div className="text-xs text-white/60">
                                 {format(new Date(gw.createdAt), 'MMM dd')}
                               </div>
                             </div>
                             <div className="flex-1">
-                              <h4 className="text-white font-medium">{gw.teamName}</h4>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-white/70 text-sm">{gw.points} points</span>
+                              <h4 className="text-white font-medium text-sm sm:text-base">{gw.teamName}</h4>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-1">
+                                <span className="text-white/70 text-xs sm:text-sm">{gw.points} points</span>
                                 {getRankBadge(gw.rank, gw.totalParticipants)}
                               </div>
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-center sm:text-right">
                           {getStatusBadge(gw.hasPaid ? "success" : "pending")}
                         </div>
                       </div>
@@ -330,20 +341,20 @@ export default function ProfilePage() {
                     {paymentHistory.map((payment: PaymentHistory) => (
                       <div
                         key={payment.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 sm:p-4 bg-white/5 rounded-lg border border-white/10"
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-4">
-                            <div className="text-center">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                            <div className="text-center sm:text-left">
                               <div className="text-lg font-bold text-fpl-green">₹{payment.amount}</div>
                               <div className="text-xs text-white/60">
                                 GW{payment.gameweekNumber}
                               </div>
                             </div>
                             <div className="flex-1">
-                              <h4 className="text-white font-medium">{payment.paymentMethod}</h4>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-white/70 text-sm">
+                              <h4 className="text-white font-medium text-sm sm:text-base">{payment.paymentMethod}</h4>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-1">
+                                <span className="text-white/70 text-xs sm:text-sm">
                                   {format(new Date(payment.createdAt), 'MMM dd, yyyy')}
                                 </span>
                                 {payment.transactionId && (
@@ -355,7 +366,7 @@ export default function ProfilePage() {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-center sm:text-right">
                           {getStatusBadge(payment.status)}
                         </div>
                       </div>

@@ -203,87 +203,104 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
       <Navigation />
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-4">Admin Dashboard</h1>
-          <p className="text-white/70 text-lg">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-4">Admin Dashboard</h1>
+          <p className="text-white/70 text-base sm:text-lg">
             Manage teams, users, and gameweek settings
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <Users className="h-8 w-8 text-blue-400" />
-                <div>
-                  <div className="text-2xl font-bold text-white">{allUsers.length}</div>
-                  <div className="text-sm text-white/70">Total Users</div>
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
+                <div className="text-center sm:text-left">
+                  <div className="text-lg sm:text-2xl font-bold text-white">
+                    {new Set(allTeams.map((team: Team) => team.userId)).size}
+                  </div>
+                  <div className="text-xs sm:text-sm text-white/70">Unique Players</div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <Trophy className="h-8 w-8 text-fpl-green" />
-                <div>
-                  <div className="text-2xl font-bold text-white">{allTeams.length}</div>
-                  <div className="text-sm text-white/70">Total Teams</div>
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-fpl-green" />
+                <div className="text-center sm:text-left">
+                  <div className="text-lg sm:text-2xl font-bold text-white">{allTeams.length}</div>
+                  <div className="text-xs sm:text-sm text-white/70">Teams Created</div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <Lock className="h-8 w-8 text-red-400" />
-                <div>
-                  <div className="text-2xl font-bold text-white">
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-red-400" />
+                <div className="text-center sm:text-left">
+                  <div className="text-lg sm:text-2xl font-bold text-white">
                     {allTeams.filter((team: Team) => team.isLocked).length}
                   </div>
-                  <div className="text-sm text-white/70">Locked Teams</div>
+                  <div className="text-xs sm:text-sm text-white/70">Locked Teams</div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white/5 border-white/20">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <Calendar className="h-8 w-8 text-yellow-400" />
-                <div>
-                  <div className="text-2xl font-bold text-white">
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" />
+                <div className="text-center sm:text-left">
+                  <div className="text-lg sm:text-2xl font-bold text-white">
                     GW {(currentGameweek as any)?.gameweekNumber || "N/A"}
                   </div>
-                  <div className="text-sm text-white/70">Current Gameweek</div>
+                  <div className="text-xs sm:text-sm text-white/70">Current Gameweek</div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* Admin Note */}
+        <Card className="bg-blue-500/10 border-blue-500/20 mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-blue-300 mb-2">
+              <Shield className="h-4 w-4" />
+              <span className="font-medium">Admin Dashboard Note</span>
+            </div>
+            <p className="text-blue-200 text-sm">
+              Team creation and editing are now handled through the user interface. 
+              Users can create teams which are saved to the database before payment approval. 
+              Only the first approved team per user can be edited.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Controls */}
         <Card className="bg-white/5 border-white/20 mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-wrap gap-4 items-center justify-between">
-              <div className="flex gap-4">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex items-center gap-2">
                   <Search className="h-4 w-4 text-white/70" />
                   <Input
                     placeholder="Search teams or users..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-64 bg-white/10 border-white/20 text-white"
+                    className="w-full sm:w-64 bg-white/10 border-white/20 text-white"
                   />
                 </div>
 
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-48 bg-white/10 border-white/20 text-white">
+                  <SelectTrigger className="w-full sm:w-48 bg-white/10 border-white/20 text-white">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue />
                   </SelectTrigger>
@@ -296,31 +313,31 @@ export default function AdminDashboard() {
                 </Select>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={exportTeamsData}
                   variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
+                  className="border-gray-300 bg-white text-black hover:bg-gray-100 text-sm"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
+                  <Download className="h-4 w-4 mr-2 text-black" />
+                  <span className="hidden sm:inline text-black">Export </span><span className="text-black">CSV</span>
                 </Button>
 
                 <Button
                   onClick={handleUpdateDeadlines}
                   variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
+                  className="border-gray-300 bg-white text-black hover:bg-gray-100 text-sm"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Update Deadlines
+                  <RefreshCw className="h-4 w-4 mr-2 text-black" />
+                  <span className="hidden sm:inline text-black">Update </span><span className="text-black">Deadlines</span>
                 </Button>
 
                 <Button
                   onClick={() => refetchTeams()}
-                  className="bg-fpl-green hover:bg-green-600 text-white"
+                  className="bg-white hover:bg-gray-100 text-black text-sm border border-gray-300"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
+                  <RefreshCw className="h-4 w-4 mr-2 text-black" />
+                  <span className="text-black">Refresh</span>
                 </Button>
               </div>
             </div>
@@ -336,7 +353,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="border-b border-white/20">
                     <th className="text-left py-3 px-4 text-white/70">Team Name</th>

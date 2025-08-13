@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Clock, Save, Users, DollarSign, Trophy, AlertCircle, Edit3, ArrowLeft } from "lucide-react";
+import { Clock, Save, Users, DollarSign, Trophy, AlertCircle, Edit3, ArrowLeft, Lock, CheckCircle2, XCircle, Timer } from "lucide-react";
 import { format } from "date-fns";
 import { FormationPitch } from "@/components/formation-pitch";
 import { EnhancedPlayerSelectionTable } from "@/components/enhanced-player-selection-table";
@@ -24,6 +25,7 @@ export default function EditTeam() {
   const [selectedPlayerForStats, setSelectedPlayerForStats] = useState<any>(null);
   const [showPlayerTable, setShowPlayerTable] = useState<number | null>(null);
   const [isModified, setIsModified] = useState(false);
+  const [activeTeamTab, setActiveTeamTab] = useState<string>("1");
 
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
@@ -33,22 +35,38 @@ export default function EditTeam() {
   // Get team number from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const teamNumberFromUrl = urlParams.get('team');
-  const teamNumber = teamNumberFromUrl ? parseInt(teamNumberFromUrl) : 1;
   
-  // Fetch user's teams to determine which team can be edited
+  // Fetch all user's teams (up to 5)
   const { data: userTeams = [], isLoading: teamsLoading } = useQuery({
     queryKey: ["/api/teams/user"],
   });
   
-  // Find the first team with approved payment (this is the only editable team)
-  const editableTeam = userTeams.find(team => team.paymentStatus === 'approved');
-  const requestedTeamNumber = teamNumberFromUrl ? parseInt(teamNumberFromUrl) : (editableTeam?.teamNumber || 1);
+  // Sort teams by team number and group by payment status
+  const sortedTeams = [...userTeams].sort((a, b) => a.teamNumber - b.teamNumber);
+  const approvedTeams = sortedTeams.filter(team => team.paymentStatus === 'approved');
+  const pendingTeams = sortedTeams.filter(team => team.paymentStatus === 'pending');
+  const rejectedTeams = sortedTeams.filter(team => team.paymentStatus === 'rejected');
+  const notSubmittedTeams = sortedTeams.filter(team => team.paymentStatus === 'not_submitted');
   
-  // Fetch specific team only if it matches the editable team number
+  // Initialize active team tab based on URL param or first approved team
+  React.useEffect(() => {
+    if (teamNumberFromUrl) {
+      setActiveTeamTab(teamNumberFromUrl);
+    } else if (approvedTeams.length > 0) {
+      setActiveTeamTab(approvedTeams[0].teamNumber.toString());
+    } else if (sortedTeams.length > 0) {
+      setActiveTeamTab(sortedTeams[0].teamNumber.toString());
+    }
+  }, [teamNumberFromUrl, approvedTeams, sortedTeams]);
+  
+  const currentTeamNumber = parseInt(activeTeamTab);
+  const currentTeamData = sortedTeams.find(team => team.teamNumber === currentTeamNumber);
+  
+  // Fetch specific team data for the active tab
   const { data: currentTeam, isLoading: teamLoading } = useQuery({
-    queryKey: ["/api/team", requestedTeamNumber],
-    queryFn: () => apiRequest("GET", `/api/team/${requestedTeamNumber}`),
-    enabled: !!editableTeam && requestedTeamNumber === editableTeam.teamNumber,
+    queryKey: ["/api/team", currentTeamNumber],
+    queryFn: () => apiRequest("GET", `/api/team/${currentTeamNumber}`),
+    enabled: !!currentTeamData && currentTeamNumber > 0,
   });
 
   // Fetch FPL data
@@ -189,14 +207,23 @@ export default function EditTeam() {
       const response = await apiRequest("POST", "/api/team/save", teamData);
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Team Updated",
-        description: "Your team changes have been saved successfully!",
-      });
+    onSuccess: (data: any) => {
+      if (data.requiresPayment) {
+        toast({
+          title: "Team Saved!",
+          description: data.message || "Team saved. Redirecting to payment...",
+        });
+        // Redirect to payment page
+        window.location.href = data.redirectTo;
+      } else {
+        toast({
+          title: "Team Updated",
+          description: "Your team changes have been saved successfully!",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/team/current"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teams/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/team", requestedTeamNumber] });
+      queryClient.invalidateQueries({ queryKey: ["/api/team", currentTeamNumber] });
       setIsModified(false);
     },
     onError: (error: any) => {
@@ -242,35 +269,44 @@ export default function EditTeam() {
       players: selectedPlayers,
       captainId,
       viceCaptainId,
-      teamNumber: currentTeam?.teamNumber || requestedTeamNumber,
+      teamNumber: currentTeam?.teamNumber || currentTeamNumber,
     };
 
     saveTeamMutation.mutate(teamData);
   };
 
   const isDeadlinePassed = currentGameweek?.deadline ? new Date() > new Date(currentGameweek.deadline) : false;
-  const canEdit = currentTeam?.canEdit;
-  const paymentStatus = currentTeam?.paymentStatus;
+  const canEdit = currentTeam?.canEdit || (currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed);
+  const paymentStatus = currentTeam?.paymentStatus || currentTeamData?.paymentStatus;
   const isLocked = currentTeam?.isLocked || isDeadlinePassed || !canEdit;
   
-  // Check if user has access to edit teams (payment must be approved AND it's the first approved team)
-  const hasEditAccess = editableTeam && currentTeam && 
-    editableTeam.teamNumber === currentTeam.teamNumber && 
-    editableTeam.paymentStatus === 'approved';
+  // Check if user has access to edit teams (payment must be approved)
+  const hasEditAccess = currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed;
   const teamExists = currentTeam && currentTeam.players && currentTeam.players.length > 0;
   
-  // Check if user is trying to edit a team they don't have access to
-  const isAccessDenied = teamNumberFromUrl && 
-    (!editableTeam || parseInt(teamNumberFromUrl) !== editableTeam.teamNumber);
+  // Update URL when switching tabs
+  const handleTabChange = (teamNumber: string) => {
+    setActiveTeamTab(teamNumber);
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('team', teamNumber);
+    window.history.replaceState({}, '', newUrl.toString());
+  };
   
-  // Redirect to the correct editable team if user tries to access wrong team
-  React.useEffect(() => {
-    if (isAccessDenied && editableTeam && !teamsLoading) {
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set('team', editableTeam.teamNumber.toString());
-      window.history.replaceState({}, '', newUrl.toString());
+  // Get payment status badge
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600"><Timer className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-500 hover:bg-red-600"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      case 'not_submitted':
+        return <Badge variant="outline"><AlertCircle className="h-3 w-3 mr-1" />Payment Required</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
     }
-  }, [isAccessDenied, editableTeam, teamsLoading]);
+  };
   
   // Show gameweek status
   const getGameweekStatus = () => {
@@ -384,50 +420,218 @@ export default function EditTeam() {
           </Card>
         )}
 
-        {/* Access Denied Message */}
-        {(!hasEditAccess && !teamLoading && !teamsLoading) && (
+        {/* Debug Information */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="bg-yellow-500/10 border-yellow-500/20 mb-6">
+            <CardContent className="p-4">
+              <div className="text-yellow-300 text-sm">
+                <p><strong>Debug Info:</strong></p>
+                <p>User Teams Length: {userTeams.length}</p>
+                <p>Sorted Teams Length: {sortedTeams.length}</p>
+                <p>Current Team Number: {currentTeamNumber}</p>
+                <p>Current Team Data: {currentTeamData ? 'Found' : 'Not Found'}</p>
+                <p>Current Team: {currentTeam ? 'Loaded' : 'Not Loaded'}</p>
+                <p>Teams Loading: {teamsLoading ? 'Yes' : 'No'}</p>
+                <p>Team Loading: {teamLoading ? 'Yes' : 'No'}</p>
+                {userTeams.length > 0 && (
+                  <p>First Team: {JSON.stringify(userTeams[0], null, 2)}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Multi-Team Tabs Interface */}
+        {(teamsLoading || teamLoading) ? (
+          <Card className="bg-white/5 border-white/20">
+            <CardContent className="p-6 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fpl-green mx-auto mb-4"></div>
+              <p className="text-white/70">Loading your teams...</p>
+            </CardContent>
+          </Card>
+        ) : sortedTeams.length > 0 ? (
+          <Card className="bg-white/5 border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Your Teams ({sortedTeams.length}/5)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTeamTab} onValueChange={handleTabChange} className="w-full">
+                <TabsList className="grid w-full grid-cols-5 mb-4">
+                  {[1, 2, 3, 4, 5].map(teamNum => {
+                    const team = sortedTeams.find(t => t.teamNumber === teamNum);
+                    const isDisabled = !team;
+                    const paymentStatus = team?.paymentStatus || 'not_submitted';
+                    
+                    return (
+                      <TabsTrigger 
+                        key={teamNum} 
+                        value={teamNum.toString()} 
+                        disabled={isDisabled}
+                        className={`flex flex-col gap-1 p-3 ${
+                          isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                        } ${
+                          paymentStatus === 'approved' ? 'bg-green-500/20 border-green-500' :
+                          paymentStatus === 'pending' ? 'bg-yellow-500/20 border-yellow-500' :
+                          paymentStatus === 'rejected' ? 'bg-red-500/20 border-red-500' :
+                          'bg-gray-500/20 border-gray-500'
+                        }`}
+                      >
+                        <span className="font-medium">Team {teamNum}</span>
+                        <div className="flex items-center gap-1">
+                          {team ? getPaymentStatusBadge(paymentStatus) : (
+                            <Badge variant="outline" className="text-xs">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Not Created
+                            </Badge>
+                          )}
+                        </div>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+                
+                {/* Tab Content for each team */}
+                {[1, 2, 3, 4, 5].map(teamNum => {
+                  const team = sortedTeams.find(t => t.teamNumber === teamNum);
+                  const isCurrentTab = teamNum.toString() === activeTeamTab;
+                  
+                  return (
+                    <TabsContent key={teamNum} value={teamNum.toString()} className="mt-4">
+                      {team ? (
+                        <div className="space-y-4">
+                          {/* Team Status Info */}
+                          <div className="flex items-center justify-between p-4 bg-white/10 rounded-lg">
+                            <div>
+                              <h3 className="font-semibold text-white">Team {teamNum}: {team.teamName || 'Unnamed Team'}</h3>
+                              <p className="text-sm text-white/70">
+                                Payment Status: {getPaymentStatusBadge(team.paymentStatus)}
+                              </p>
+                              <p className="text-xs text-white/50">
+                                Players: {Array.isArray(team.players) ? team.players.length : 0}/11 • 
+                                Can Edit: {team.canEdit ? 'Yes' : 'No'}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              {team.paymentStatus === 'approved' ? (
+                                <Badge className="bg-green-500 hover:bg-green-600">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Editable
+                                </Badge>
+                              ) : team.paymentStatus === 'pending' ? (
+                                <Badge className="bg-yellow-500 hover:bg-yellow-600">
+                                  <Timer className="h-3 w-3 mr-1" />
+                                  Awaiting Approval
+                                </Badge>
+                              ) : team.paymentStatus === 'rejected' ? (
+                                <Badge className="bg-red-500 hover:bg-red-600">
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Payment Rejected
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  Payment Required
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Action buttons based on payment status */}
+                          <div className="flex gap-2">
+                            {team.paymentStatus === 'approved' ? (
+                              <p className="text-green-400 text-sm flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4" />
+                                This team is ready for editing! Use the form below to make changes.
+                              </p>
+                            ) : team.paymentStatus === 'pending' ? (
+                              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 w-full">
+                                <p className="text-yellow-400 text-sm flex items-center gap-2 font-medium mb-2">
+                                  <Timer className="h-4 w-4" />
+                                  TEAM NOT YET APPROVED
+                                </p>
+                                <p className="text-yellow-300 text-sm">
+                                  Your payment is pending admin approval. The team exists but cannot be edited until payment is approved.
+                                </p>
+                              </div>
+                            ) : team.paymentStatus === 'rejected' ? (
+                              <div className="flex items-center gap-2 w-full">
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex-1">
+                                  <p className="text-red-400 text-sm flex items-center gap-2 font-medium mb-2">
+                                    <XCircle className="h-4 w-4" />
+                                    PAYMENT REJECTED
+                                  </p>
+                                  <p className="text-red-300 text-sm mb-2">
+                                    Your payment was rejected. Please resubmit payment to make this team editable.
+                                  </p>
+                                  <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
+                                    <Button size="sm" className="bg-red-600 hover:bg-red-700">
+                                      Resubmit Payment
+                                    </Button>
+                                  </Link>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 w-full">
+                                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex-1">
+                                  <p className="text-orange-400 text-sm flex items-center gap-2 font-medium mb-2">
+                                    <AlertCircle className="h-4 w-4" />
+                                    PAYMENT REQUIRED
+                                  </p>
+                                  <p className="text-orange-300 text-sm mb-2">
+                                    Complete payment to make this team editable.
+                                  </p>
+                                  <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${teamNum}`}>
+                                    <Button size="sm" className="bg-fpl-green hover:bg-green-600">
+                                      Complete Payment
+                                    </Button>
+                                  </Link>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center p-8 bg-white/5 rounded-lg">
+                          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold text-white mb-2">
+                            Team {teamNum} Not Created
+                          </h3>
+                          <p className="text-white/70 mb-4">
+                            Create Team {teamNum} to expand your fantasy football strategy.
+                          </p>
+                          <Link href={`/?team=${teamNum}`}>
+                            <Button className="bg-fpl-green hover:bg-green-600">
+                              <Trophy className="h-4 w-4 mr-2" />
+                              Create Team {teamNum}
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            </CardContent>
+          </Card>
+        ) : (
           <Card className="border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20">
             <CardContent className="p-6 text-center">
               <AlertCircle className="h-12 w-12 text-blue-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                {editableTeam ? "Team Access Restricted" : "Payment Required to Edit Teams"}
+                No Teams Created
               </h3>
               <p className="text-blue-700 dark:text-blue-300 mb-4">
-                {editableTeam ? (
-                  <>You can only edit your first approved team (Team {editableTeam.teamNumber}). Other teams cannot be edited once created and paid for.</>
-                ) : (
-                  <>You can only edit teams after your payment has been verified and approved by admin. 
-                  {userTeams.length === 0 && "Please create and pay for a team first."}
-                  {userTeams.length > 0 && userTeams[0]?.paymentStatus === 'pending' && "Your payment is currently being reviewed."}
-                  {userTeams.length > 0 && userTeams[0]?.paymentStatus === 'rejected' && "Your payment was rejected. Please resubmit payment."}
-                  {userTeams.length > 0 && userTeams[0]?.paymentStatus === 'not_submitted' && "Please complete payment for your team."}
-                  </>
-                )}
+                You haven't created any teams yet. Start by creating your first team!
               </p>
-              <div className="flex gap-2 justify-center">
-                {editableTeam ? (
-                  <Link href={`/edit-team?team=${editableTeam.teamNumber}`}>
-                    <Button className="bg-fpl-green hover:bg-green-600">
-                      Edit Team {editableTeam.teamNumber}
-                    </Button>
-                  </Link>
-                ) : (
-                  <>
-                    <Link href="/">
-                      <Button className="bg-fpl-green hover:bg-green-600">
-                        Create New Team
-                      </Button>
-                    </Link>
-                    {userTeams.length > 0 && userTeams[0]?.paymentStatus !== 'approved' && userTeams[0]?.paymentStatus !== 'pending' && (
-                      <Link href={`/manual-payment?gameweek=${currentGameweek?.id}&team=${userTeams[0]?.teamNumber || 1}`}>
-                        <Button variant="outline">
-                          Complete Payment
-                        </Button>
-                      </Link>
-                    )}
-                  </>
-                )}
-              </div>
+              <Link href="/">
+                <Button className="bg-fpl-green hover:bg-green-600">
+                  <Trophy className="h-4 w-4 mr-2" />
+                  Create Your First Team
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         )}

@@ -8,6 +8,8 @@ import { enhancedFplAPI } from "./enhanced-fpl-api";
 import { hybridFplService } from "./hybrid-fpl-service";
 import { apiUsageMonitor } from "./api-usage-monitor";
 import { sessionManager } from "./enhanced-session-manager";
+import { checkDeadlineMiddleware, requireActiveDeadline } from "./deadline-middleware";
+import { fplScoringService } from "./fpl-scoring-service";
 import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults, paymentProofs } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -34,7 +36,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
   // Add cookie parser middleware for payment routes
-app.use(cookieParser());
+  app.use(cookieParser());
+  
+  // Add deadline checking middleware for all routes
+  app.use(checkDeadlineMiddleware);
+  
+  // Start FPL scoring service
+  fplScoringService.startAutoScoring();
   
   // Register team management routes
   app.use("/api/teams", teamsRouter);
@@ -360,43 +368,261 @@ app.use(cookieParser());
     }
 
     try {
-      const currentGameweek = await storage.getCurrentGameweek();
-      if (!currentGameweek) {
-        return res.status(404).json({ error: "No active gameweek found" });
+      let currentGameweek = await storage.getCurrentGameweek();
+      const now = new Date();
+      
+      // Use the same real-time logic as /api/gameweek/current
+      let latestFplGameweek;
+      let latestDeadline;
+      
+      try {
+        console.log('🔄 [ADMIN] Fetching latest gameweek data for deadline update...');
+        latestFplGameweek = await hybridFplService.getCurrentGameweek();
+        
+        // Get the actual deadline from FPL - this is 2 hours before first match
+        const fixtures = await hybridFplService.getFixtures(latestFplGameweek.id);
+        const upcomingFixtures = fixtures
+          .filter(f => !f.finished && f.event === latestFplGameweek.id)
+          .sort((a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime());
+        
+        if (upcomingFixtures.length > 0) {
+          // Set deadline to 2 hours before first match of the gameweek
+          const firstMatchTime = new Date(upcomingFixtures[0].kickoff_time);
+          latestDeadline = new Date(firstMatchTime.getTime() - (2 * 60 * 60 * 1000)); // 2 hours before
+          console.log(`⏰ [ADMIN] Real deadline: ${latestDeadline.toISOString()} (2h before first match: ${firstMatchTime.toISOString()})`);
+        } else {
+          // Fallback to FPL's deadline if no fixtures found
+          latestDeadline = new Date(latestFplGameweek.deadline_time);
+          console.log(`⏰ [ADMIN] Using FPL deadline: ${latestDeadline.toISOString()}`);
+        }
+      } catch (fplError) {
+        console.warn('⚠️ [ADMIN] Failed to fetch latest FPL data:', fplError.message);
+        // If we can't get latest data, try to update existing gameweek with FPL API
+        if (currentGameweek) {
+          const deadline = await fplAPI.getGameweekDeadline(currentGameweek.gameweekNumber);
+          await storage.updateGameweekDeadline(currentGameweek.id, new Date(deadline));
+          return res.json({
+            message: "Deadline updated using fallback FPL API",
+            newDeadline: deadline,
+            gameweek: currentGameweek.gameweekNumber,
+            source: "fpl-api-fallback"
+          });
+        } else {
+          return res.status(404).json({ error: "No active gameweek found and cannot fetch FPL data" });
+        }
       }
-
-      // Update deadline based on current gameweek fixtures
-      const deadline = await fplAPI.getGameweekDeadline(currentGameweek.gameweekNumber);
-      await storage.updateGameweekDeadline(currentGameweek.id, new Date(deadline));
-
+      
+      let updatedGameweek;
+      let updateMessage = "";
+      
+      // Check if we need to create or update gameweek (same logic as gameweek/current)
+      if (!currentGameweek) {
+        if (latestFplGameweek && latestDeadline) {
+          console.log('🆕 [ADMIN] Creating new gameweek from real-time data...');
+          updatedGameweek = await storage.createGameweek(latestFplGameweek.id, latestDeadline);
+          updateMessage = `Created new gameweek ${latestFplGameweek.id} with real-time deadline`;
+        } else {
+          return res.status(404).json({ error: "No active gameweek found and cannot create from FPL data" });
+        }
+      } else if (latestFplGameweek && latestDeadline) {
+        // Update existing gameweek if FPL data is different
+        const currentDeadlineTime = new Date(currentGameweek.deadline).getTime();
+        const latestDeadlineTime = latestDeadline.getTime();
+        const gameweekNumberChanged = currentGameweek.gameweekNumber !== latestFplGameweek.id;
+        const deadlineChanged = Math.abs(currentDeadlineTime - latestDeadlineTime) > 60000; // More than 1 minute difference
+        
+        if (gameweekNumberChanged) {
+          console.log(`🔄 [ADMIN] Gameweek changed from ${currentGameweek.gameweekNumber} to ${latestFplGameweek.id}`);
+          // Mark current gameweek as completed and create new one
+          await storage.updateGameweekStatus(currentGameweek.id, true);
+          updatedGameweek = await storage.createGameweek(latestFplGameweek.id, latestDeadline);
+          updateMessage = `Gameweek transition: completed GW${currentGameweek.gameweekNumber}, created GW${latestFplGameweek.id} with real-time deadline`;
+        } else if (deadlineChanged) {
+          console.log(`⏰ [ADMIN] Deadline updated for GW${currentGameweek.gameweekNumber}`);
+          await storage.updateGameweekDeadline(currentGameweek.id, latestDeadline);
+          updatedGameweek = { ...currentGameweek, deadline: latestDeadline };
+          updateMessage = `Updated deadline for GW${currentGameweek.gameweekNumber} with real-time data`;
+        } else {
+          updatedGameweek = currentGameweek;
+          updateMessage = `No updates needed - GW${currentGameweek.gameweekNumber} deadline is already current`;
+        }
+      }
+      
+      // Calculate response data
+      const deadline = new Date(updatedGameweek.deadline);
+      const canModifyTeam = now <= deadline && !updatedGameweek.isCompleted;
+      const timeUntilDeadline = Math.max(0, deadline.getTime() - now.getTime());
+      const hoursUntilDeadline = timeUntilDeadline / (1000 * 60 * 60);
+      
       res.json({ 
-        message: "Deadline updated successfully",
-        newDeadline: deadline,
-        gameweek: currentGameweek.gameweekNumber
+        message: updateMessage,
+        gameweek: {
+          id: updatedGameweek.id,
+          gameweekNumber: updatedGameweek.gameweekNumber,
+          deadline: deadline.toISOString(),
+          isCompleted: updatedGameweek.isCompleted,
+          canModifyTeam,
+          hoursUntilDeadline: hoursUntilDeadline.toFixed(1)
+        },
+        source: "hybrid-fpl-service",
+        updatedAt: now.toISOString()
       });
     } catch (error) {
-      console.error("Error updating deadlines:", error);
-      res.status(500).json({ error: "Failed to update deadlines" });
+      console.error("❌ [ADMIN] Error updating deadlines:", error);
+      res.status(500).json({ error: "Failed to update deadlines", details: error.message });
     }
   });
 
-  // Gameweek management
+  // Gameweek management with real-time FPL data
   app.get("/api/gameweek/current", async (req, res) => {
     try {
       let currentGameweek = await storage.getCurrentGameweek();
+      const now = new Date();
       
-      if (!currentGameweek) {
-        // Create first gameweek if none exists
-        const fplGameweek = await fplAPI.getCurrentGameweek();
-        const deadline = await fplAPI.getGameweekDeadline(fplGameweek.id);
+      // Always try to get fresh FPL data first
+      let latestFplGameweek;
+      let latestDeadline;
+      
+      try {
+        console.log('🔄 Fetching latest gameweek data from FPL API...');
+        latestFplGameweek = await hybridFplService.getCurrentGameweek();
         
-        currentGameweek = await storage.createGameweek(fplGameweek.id, new Date(deadline));
+        // Get the actual deadline from FPL - this is 2 hours before first match
+        const fixtures = await hybridFplService.getFixtures(latestFplGameweek.id);
+        const upcomingFixtures = fixtures
+          .filter(f => !f.finished && f.event === latestFplGameweek.id)
+          .sort((a, b) => new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime());
+        
+        if (upcomingFixtures.length > 0) {
+          // Set deadline to 2 hours before first match of the gameweek
+          const firstMatchTime = new Date(upcomingFixtures[0].kickoff_time);
+          latestDeadline = new Date(firstMatchTime.getTime() - (2 * 60 * 60 * 1000)); // 2 hours before
+          console.log(`⏰ Real deadline: ${latestDeadline.toISOString()} (2h before first match: ${firstMatchTime.toISOString()})`);
+        } else {
+          // Fallback to FPL's deadline if no fixtures found
+          latestDeadline = new Date(latestFplGameweek.deadline_time);
+          console.log(`⏰ Using FPL deadline: ${latestDeadline.toISOString()}`);
+        }
+      } catch (fplError) {
+        console.warn('⚠️ Failed to fetch latest FPL data:', fplError.message);
       }
       
-      res.json(currentGameweek);
+      // Check if we need to create or update gameweek
+      if (!currentGameweek) {
+        if (latestFplGameweek && latestDeadline) {
+          console.log('🆕 Creating new gameweek from RapidAPI hybrid data...');
+          currentGameweek = await storage.createGameweek(latestFplGameweek.id, latestDeadline);
+        } else {
+          // Emergency fallback - use current date logic for mid-season
+          console.log('🚨 Creating emergency gameweek with current date logic...');
+          const now = new Date();
+          const currentMonth = now.getMonth() + 1; // 1-based month
+          const currentDay = now.getDate();
+          
+          // Determine likely gameweek based on current date (rough estimation)
+          let estimatedGameweek = 1;
+          let fallbackDeadline = new Date();
+          
+          if (currentMonth >= 8) {
+            // Season has started - estimate gameweek
+            if (currentMonth === 8) {
+              estimatedGameweek = Math.min(4, Math.max(1, Math.floor(currentDay / 7)));
+            } else if (currentMonth >= 9 && currentMonth <= 12) {
+              estimatedGameweek = 4 + ((currentMonth - 9) * 4) + Math.floor(currentDay / 7);
+            } else if (currentMonth >= 1 && currentMonth <= 5) {
+              estimatedGameweek = 20 + ((currentMonth - 1) * 4) + Math.floor(currentDay / 7);
+            }
+          }
+          
+          // Set deadline to next Saturday 11:30 AM (typical PL kickoff)
+          fallbackDeadline = new Date();
+          const daysUntilSaturday = (6 - fallbackDeadline.getDay() + 7) % 7 || 7;
+          fallbackDeadline.setDate(fallbackDeadline.getDate() + daysUntilSaturday);
+          fallbackDeadline.setHours(9, 30, 0, 0); // 11:30 AM is 09:30 UTC (roughly)
+          
+          console.log(`📅 Estimated GW${estimatedGameweek} with deadline: ${fallbackDeadline.toISOString()}`);
+          currentGameweek = await storage.createGameweek(estimatedGameweek, fallbackDeadline);
+        }
+      } else if (latestFplGameweek && latestDeadline) {
+        // Update existing gameweek if FPL data is different (deadline may have changed)
+        const currentDeadlineTime = new Date(currentGameweek.deadline).getTime();
+        const latestDeadlineTime = latestDeadline.getTime();
+        const gameweekNumberChanged = currentGameweek.gameweekNumber !== latestFplGameweek.id;
+        const deadlineChanged = Math.abs(currentDeadlineTime - latestDeadlineTime) > 60000; // More than 1 minute difference
+        
+        if (gameweekNumberChanged) {
+          console.log(`🔄 Gameweek changed from ${currentGameweek.gameweekNumber} to ${latestFplGameweek.id}`);
+          // Mark current gameweek as completed and create new one
+          await storage.updateGameweekStatus(currentGameweek.id, true);
+          currentGameweek = await storage.createGameweek(latestFplGameweek.id, latestDeadline);
+        } else if (deadlineChanged) {
+          console.log(`⏰ Deadline updated for GW${currentGameweek.gameweekNumber}`);
+          await storage.updateGameweekDeadline(currentGameweek.id, latestDeadline);
+          currentGameweek = { ...currentGameweek, deadline: latestDeadline };
+        }
+      }
+      
+      // Check if gameweek should be completed (deadline passed + matches started)
+      const deadlineTime = new Date(currentGameweek.deadline);
+      const isDeadlinePassed = now > deadlineTime;
+      
+      if (isDeadlinePassed && !currentGameweek.isCompleted) {
+        // Check if matches have actually started by checking fixtures
+        try {
+          const fixtures = await hybridFplService.getFixtures(currentGameweek.gameweekNumber);
+          const anyMatchStarted = fixtures.some(f => 
+            f.event === currentGameweek.gameweekNumber && 
+            (f.started || f.finished)
+          );
+          
+          if (anyMatchStarted) {
+            console.log(`⚽ GW${currentGameweek.gameweekNumber} matches started - marking as completed`);
+            await storage.updateGameweekStatus(currentGameweek.id, true);
+            currentGameweek = { ...currentGameweek, isCompleted: true };
+          }
+        } catch (error) {
+          console.warn('Could not check match status:', error.message);
+        }
+      }
+      
+      // Calculate response data
+      const canModifyTeam = now <= deadlineTime && !currentGameweek.isCompleted;
+      const timeUntilDeadline = Math.max(0, deadlineTime.getTime() - now.getTime());
+      
+      const response = {
+        ...currentGameweek,
+        canModifyTeam,
+        timeUntilDeadline,
+        deadlineFormatted: deadlineTime.toISOString(),
+        hoursUntilDeadline: timeUntilDeadline / (1000 * 60 * 60),
+        isLive: latestFplGameweek ? true : false,
+        lastUpdated: now.toISOString()
+      };
+      
+      console.log(`📊 GW${response.gameweekNumber}: ${response.hoursUntilDeadline.toFixed(1)}h until deadline (${canModifyTeam ? 'OPEN' : 'CLOSED'})`);
+      
+      res.json(response);
     } catch (error) {
-      console.error("Error fetching current gameweek:", error);
-      res.status(500).json({ error: "Failed to fetch current gameweek" });
+      console.error("❌ Error in gameweek endpoint:", error);
+      
+      // Final emergency fallback
+      const emergencyDeadline = new Date('2024-08-17T10:30:00.000Z'); // GW1 2024/25
+      const now = new Date();
+      
+      res.json({
+        id: 1,
+        gameweekNumber: 1,
+        deadline: emergencyDeadline.toISOString(),
+        isActive: true,
+        isCompleted: false,
+        canModifyTeam: now <= emergencyDeadline,
+        timeUntilDeadline: Math.max(0, emergencyDeadline.getTime() - now.getTime()),
+        deadlineFormatted: emergencyDeadline.toISOString(),
+        hoursUntilDeadline: Math.max(0, (emergencyDeadline.getTime() - now.getTime()) / (1000 * 60 * 60)),
+        isLive: false,
+        error: "Using emergency fallback data - check FPL API connection",
+        lastUpdated: now.toISOString()
+      });
     }
   });
 
@@ -543,7 +769,7 @@ app.use(cookieParser());
     }
   });
 
-  // Team save endpoint - validates team and redirects to payment
+  // Team save endpoint - saves team to DB BEFORE payment approval
   app.post("/api/team/save", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
@@ -553,9 +779,32 @@ app.use(cookieParser());
         return res.status(404).json({ error: "No active gameweek" });
       }
 
-      // Check if deadline has passed
-      if (new Date() > currentGameweek.deadline) {
-        return res.status(403).json({ error: "Gameweek deadline has passed" });
+      // COMPREHENSIVE DEADLINE CHECK (admins are exempt)
+      const now = new Date();
+      const deadline = new Date(currentGameweek.deadline);
+      const isDeadlinePassed = now > deadline;
+      const isGameweekCompleted = currentGameweek.isCompleted;
+      
+      if (!req.user!.isAdmin && (isDeadlinePassed || isGameweekCompleted)) {
+        console.log(`TEAM SAVE BLOCKED: Non-admin user ${req.user!.email} tried to save team after deadline`);
+        console.log(`Deadline: ${deadline.toISOString()}, Current time: ${now.toISOString()}`);
+        
+        return res.status(403).json({ 
+          error: isGameweekCompleted 
+            ? "Gameweek is completed - no more team changes allowed" 
+            : "Deadline has passed - team creation/editing is now closed",
+          deadline: deadline.toISOString(),
+          currentTime: now.toISOString(),
+          gameweekNumber: currentGameweek.gameweekNumber,
+          isDeadlinePassed,
+          isGameweekCompleted,
+          hoursAfterDeadline: (now.getTime() - deadline.getTime()) / (1000 * 60 * 60),
+          message: "You can still view the leaderboard to see results once matches are completed"
+        });
+      }
+      
+      if (req.user!.isAdmin && (isDeadlinePassed || isGameweekCompleted)) {
+        console.log(`ADMIN OVERRIDE: ${req.user!.email} saving team after deadline - allowed for admin`);
       }
       
       // Extract team data and additional fields separately
@@ -567,25 +816,35 @@ app.use(cookieParser());
         return res.status(400).json({ error: "Team must have exactly 11 players" });
       }
       
-      // Validate budget constraint
-      const players = await fplAPI.getPlayers();
-      const selectedPlayers = players.filter((p: any) => teamData.players?.includes(p.id));
-      const totalCost = selectedPlayers.reduce((sum: number, p: any) => sum + p.now_cost, 0);
-      
-      if (totalCost > 1000) { // 100.0m in API units
-        return res.status(400).json({ error: "Team exceeds budget limit" });
+      // Validate budget constraint using hybrid service (with fallback)
+      let players;
+      try {
+        players = await hybridFplService.getPlayers();
+      } catch (error) {
+        console.warn("Failed to fetch players for validation, skipping budget validation:", error);
+        // Continue without budget validation if API fails
+        players = [];
       }
       
-      // Validate max 3 players per team
-      const teamCounts = new Map();
-      selectedPlayers.forEach((player: any) => {
-        const count = teamCounts.get(player.team) || 0;
-        teamCounts.set(player.team, count + 1);
-      });
-      
-      for (const [teamId, count] of Array.from(teamCounts.entries())) {
-        if (count > 3) {
-          return res.status(400).json({ error: "Maximum 3 players allowed from the same team" });
+      if (players && players.length > 0) {
+        const selectedPlayers = players.filter((p: any) => teamData.players?.includes(p.id));
+        const totalCost = selectedPlayers.reduce((sum: number, p: any) => sum + p.now_cost, 0);
+        
+        if (totalCost > 1000) { // 100.0m in API units
+          return res.status(400).json({ error: "Team exceeds budget limit" });
+        }
+        
+        // Validate max 3 players per team
+        const teamCounts = new Map();
+        selectedPlayers.forEach((player: any) => {
+          const count = teamCounts.get(player.team) || 0;
+          teamCounts.set(player.team, count + 1);
+        });
+        
+        for (const [teamId, count] of Array.from(teamCounts.entries())) {
+          if (count > 3) {
+            return res.status(400).json({ error: "Maximum 3 players allowed from the same team" });
+          }
         }
       }
       
@@ -593,8 +852,8 @@ app.use(cookieParser());
       const existingTeams = await storage.getUserTeamsForGameweek(req.user!.id, currentGameweek.id);
       const nextTeamNumber = teamNumber || (existingTeams.length + 1);
       
-      // **CRITICAL: Only allow editing the FIRST approved team**
-      // Get all user's approved payments for this gameweek, ordered by team number
+      // **CRITICAL: Check if this is an edit to any approved team**
+      // Get all user's approved payments for this gameweek
       const allApprovedPayments = await db
         .select()
         .from(paymentProofs)
@@ -607,26 +866,12 @@ app.use(cookieParser());
         )
         .orderBy(paymentProofs.teamNumber);
       
-      // Find the first approved team (lowest team number)
-      const firstApprovedPayment = allApprovedPayments[0];
+      // Check if user is trying to edit ANY team they have approved payment for
+      const approvedTeamNumbers = allApprovedPayments.map(p => p.teamNumber);
+      const isEditingApprovedTeam = teamNumber && approvedTeamNumbers.includes(teamNumber);
       
-      // Check if user is trying to edit a specific team number
-      if (teamNumber && firstApprovedPayment) {
-        // If they're trying to edit a team that's NOT their first approved team, deny access
-        if (teamNumber !== firstApprovedPayment.teamNumber) {
-          return res.status(403).json({ 
-            error: "Access denied", 
-            message: `You can only edit your first approved team (Team ${firstApprovedPayment.teamNumber}). Other teams cannot be modified once created.`
-          });
-        }
-      }
-      
-      // Check if user has approved payment for the team they're trying to edit
-      const approvedPayment = firstApprovedPayment && (!teamNumber || teamNumber === firstApprovedPayment.teamNumber) 
-        ? [firstApprovedPayment] : [];
-      
-      if (approvedPayment.length > 0) {
-        // User has approved payment, check if team exists and update it
+      if (isEditingApprovedTeam) {
+        // User is editing their approved team - allow updates
         const existingTeam = await db
           .select()
           .from(teams)
@@ -634,70 +879,136 @@ app.use(cookieParser());
             and(
               eq(teams.userId, req.user!.id),
               eq(teams.gameweekId, currentGameweek.id),
-              eq(teams.teamNumber, nextTeamNumber)
+              eq(teams.teamNumber, teamNumber)
             )
           )
           .limit(1);
         
-        let team;
         if (existingTeam.length > 0) {
-          // Update existing team
+          // Update existing approved team
           const [updatedTeam] = await db
             .update(teams)
             .set({
               ...teamData,
-              teamNumber: nextTeamNumber
+              teamNumber: teamNumber
             })
             .where(eq(teams.id, existingTeam[0].id))
             .returning();
-          team = updatedTeam;
-        } else {
-          // Create new team with approved payment
-          const [newTeam] = await db
-            .insert(teams)
-            .values({
-              ...teamData,
-              userId: req.user!.id,
-              gameweekId: currentGameweek.id,
-              teamNumber: nextTeamNumber,
-              isActive: true
-            })
-            .returning();
-          team = newTeam;
-          
-          // Link payment proof to team
-          await db
-            .update(paymentProofs)
-            .set({ teamId: team.id })
-            .where(eq(paymentProofs.id, approvedPayment[0].id));
+            
+          return res.json({
+            success: true,
+            team: updatedTeam,
+            message: "Team updated successfully!"
+          });
         }
-        
-        return res.json({
-          success: true,
-          team,
-          message: "Team saved successfully!"
-        });
       }
       
-      // No approved payment, store team data temporarily and redirect to payment
-      req.session.pendingTeam = {
-        ...teamData,
-        gameweekId: currentGameweek.id,
-        teamNumber: nextTeamNumber
-      };
+      // **CRITICAL: For new teams, ALWAYS save to DB first, then redirect to payment**
+      // Check if team already exists (for this team number)
+      const existingTeam = await db
+        .select()
+        .from(teams)
+        .where(
+          and(
+            eq(teams.userId, req.user!.id),
+            eq(teams.gameweekId, currentGameweek.id),
+            eq(teams.teamNumber, nextTeamNumber)
+          )
+        )
+        .limit(1);
       
-      // Redirect to payment flow
+      let savedTeam;
+      if (existingTeam.length > 0) {
+        // Update existing team
+        const [updatedTeam] = await db
+          .update(teams)
+          .set({
+            ...teamData,
+            teamNumber: nextTeamNumber
+          })
+          .where(eq(teams.id, existingTeam[0].id))
+          .returning();
+        savedTeam = updatedTeam;
+      } else {
+        // Create new team in DB BEFORE payment
+        const [newTeam] = await db
+          .insert(teams)
+          .values({
+            ...teamData,
+            userId: req.user!.id,
+            gameweekId: currentGameweek.id,
+            teamNumber: nextTeamNumber,
+            isActive: false // Team is inactive until payment is approved
+          })
+          .returning();
+        savedTeam = newTeam;
+      }
+      
+      // Check if payment already exists for this team
+      console.log(`Checking payment for user ${req.user!.id}, gameweek ${currentGameweek.id}, team ${nextTeamNumber}`);
+      const existingPaymentProof = await db
+        .select()
+        .from(paymentProofs)
+        .where(
+          and(
+            eq(paymentProofs.userId, req.user!.id),
+            eq(paymentProofs.gameweekId, currentGameweek.id),
+            eq(paymentProofs.teamNumber, nextTeamNumber)
+          )
+        )
+        .limit(1);
+      
+      console.log("Existing payment proof:", existingPaymentProof);
+      
+      if (existingPaymentProof.length > 0) {
+        const proof = existingPaymentProof[0];
+        if (proof.status === 'approved') {
+          // Payment already approved, activate team
+          await db
+            .update(teams)
+            .set({ isActive: true })
+            .where(eq(teams.id, savedTeam.id));
+            
+          return res.json({
+            success: true,
+            team: { ...savedTeam, isActive: true },
+            message: "Team saved successfully!"
+          });
+        } else if (proof.status === 'pending') {
+          return res.json({
+            success: true,
+            team: savedTeam,
+            message: "Team saved! Payment is pending admin approval.",
+            paymentStatus: 'pending'
+          });
+        } else if (proof.status === 'rejected') {
+          // Payment was rejected, redirect to payment again
+          return res.json({ 
+            success: true,
+            requiresPayment: true,
+            redirectTo: `/manual-payment?gameweek=${currentGameweek.id}&team=${nextTeamNumber}`,
+            message: "Team saved. Previous payment was rejected - please submit payment again.",
+            gameweekId: currentGameweek.id,
+            teamNumber: nextTeamNumber,
+            teamId: savedTeam.id,
+            amount: 20
+          });
+        }
+      }
+      
+      // No payment proof exists, redirect to payment
       res.json({ 
         success: true,
         requiresPayment: true,
         redirectTo: `/manual-payment?gameweek=${currentGameweek.id}&team=${nextTeamNumber}`,
-        message: "Team validated successfully. Please complete payment to register your team.",
+        message: "Team saved successfully! Please complete payment to activate your team.",
         gameweekId: currentGameweek.id,
         teamNumber: nextTeamNumber,
+        teamId: savedTeam.id,
         amount: 20
       });
     } catch (error) {
-      console.error("Error validating team:", error);
+      console.error("Error saving team:", error);
       console.error("Request body:", req.body);
       console.error("Stack trace:", error instanceof Error ? error.stack : 'No stack trace');
       
@@ -707,7 +1018,7 @@ app.use(cookieParser());
       }
       
       res.status(500).json({ 
-        error: "Failed to validate team",
+        error: "Failed to save team",
         message: error instanceof Error ? error.message : 'Unknown error',
         details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : error) : undefined
       });
@@ -804,9 +1115,32 @@ app.use(cookieParser());
         }
       }
       
-      // Check if deadline has passed
-      if (new Date() > currentGameweek.deadline) {
-        return res.status(403).json({ error: "Gameweek deadline has passed" });
+      // COMPREHENSIVE DEADLINE CHECK (admins are exempt)
+      const now = new Date();
+      const deadline = new Date(currentGameweek.deadline);
+      const isDeadlinePassed = now > deadline;
+      const isGameweekCompleted = currentGameweek.isCompleted;
+      
+      if (!req.user!.isAdmin && (isDeadlinePassed || isGameweekCompleted)) {
+        console.log(`TEAM CREATE BLOCKED: Non-admin user ${req.user!.email} tried to create team after deadline`);
+        console.log(`Deadline: ${deadline.toISOString()}, Current time: ${now.toISOString()}`);
+        
+        return res.status(403).json({ 
+          error: isGameweekCompleted 
+            ? "Gameweek is completed - no more team changes allowed" 
+            : "Deadline has passed - team creation is now closed",
+          deadline: deadline.toISOString(),
+          currentTime: now.toISOString(),
+          gameweekNumber: currentGameweek.gameweekNumber,
+          isDeadlinePassed,
+          isGameweekCompleted,
+          hoursAfterDeadline: (now.getTime() - deadline.getTime()) / (1000 * 60 * 60),
+          message: "You can still view the leaderboard to see results once matches are completed"
+        });
+      }
+      
+      if (req.user!.isAdmin && (isDeadlinePassed || isGameweekCompleted)) {
+        console.log(`ADMIN OVERRIDE: ${req.user!.email} creating team after deadline - allowed for admin`);
       }
       
       const teamData = insertTeamSchema.parse(req.body);
@@ -1104,13 +1438,144 @@ app.use(cookieParser());
     
     try {
       const gameweekId = parseInt(req.params.gameweekId);
-      await storage.updateGameweekStatus(gameweekId, true);
       
-      // TODO: Calculate and store gameweek results using live FPL data
-      res.json({ success: true });
+      // Calculate scores using FPL API before completing gameweek
+      const scores = await fplScoringService.triggerScoreCalculation(gameweekId);
+      
+      res.json({ 
+        success: true, 
+        message: `Gameweek ${gameweekId} completed and scores calculated`,
+        scoresCalculated: scores.length,
+        totalPoints: scores.reduce((sum, s) => sum + s.totalPoints, 0)
+      });
     } catch (error) {
       console.error("Error completing gameweek:", error);
       res.status(500).json({ error: "Failed to complete gameweek" });
+    }
+  });
+
+  // FPL Scoring Service Endpoints
+  app.post("/api/admin/calculate-scores/:gameweekId?", sessionManager.requireAdmin(), async (req, res) => {
+    try {
+      const gameweekId = req.params.gameweekId ? parseInt(req.params.gameweekId) : undefined;
+      const scores = await fplScoringService.triggerScoreCalculation(gameweekId);
+      
+      res.json({
+        message: "Scores calculated successfully",
+        gameweekId: gameweekId || "current",
+        teamsProcessed: scores.length,
+        totalPoints: scores.reduce((sum, s) => sum + s.totalPoints, 0),
+        topTeam: scores.length > 0 ? {
+          teamId: scores[0].teamId,
+          userId: scores[0].userId,
+          points: scores[0].totalPoints
+        } : null
+      });
+    } catch (error) {
+      console.error("Error calculating scores:", error);
+      res.status(500).json({ error: error.message || "Failed to calculate scores" });
+    }
+  });
+
+  // Enhanced leaderboard with user's team details and top 10
+  app.get("/api/leaderboard/enhanced/:gameweekId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const gameweekId = parseInt(req.params.gameweekId);
+      if (isNaN(gameweekId)) {
+        return res.status(400).json({ error: "Invalid gameweek ID" });
+      }
+
+      // Get top 10 teams
+      const topTeams = await storage.getGameweekLeaderboard(gameweekId, 10);
+      
+      // Get user's teams for this gameweek with detailed scoring
+      const userTeams = await storage.getUserTeamsForGameweek(req.user!.id, gameweekId);
+      
+      const userTeamDetails = await Promise.all(
+        userTeams.map(async (team) => {
+          const players = await storage.getTeamPlayers(team.id);
+          
+          // Get user's rank from leaderboard
+          const allResults = await storage.getGameweekLeaderboard(gameweekId, 1000);
+          const userResult = allResults.find(r => r.teamId === team.id);
+          
+          return {
+            teamId: team.id,
+            teamName: team.teamName,
+            totalPoints: team.totalPoints || 0,
+            rank: userResult?.rank || 0,
+            players: players.map(p => ({
+              playerId: p.fplPlayerId,
+              playerName: p.playerName,
+              position: p.position,
+              points: p.gameweekPoints || 0,
+              isCaptain: p.isCaptain,
+              isViceCaptain: p.isViceCaptain,
+              actualPoints: p.isCaptain ? (p.gameweekPoints || 0) * 2 : (p.gameweekPoints || 0)
+            }))
+          };
+        })
+      );
+
+      res.json({
+        topTeams,
+        userTeams: userTeamDetails,
+        gameweekId,
+        totalParticipants: topTeams.length > 0 ? Math.max(...topTeams.map(t => t.rank || 0)) : 0
+      });
+    } catch (error) {
+      console.error("Error fetching enhanced leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // Get detailed team scoring breakdown
+  app.get("/api/team/:teamId/scoring-breakdown", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const teamId = parseInt(req.params.teamId);
+      
+      // Verify user owns this team or is admin
+      const team = await db.select()
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1);
+        
+      if (team.length === 0) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      if (team[0].userId !== req.user!.id && !req.user!.isAdmin) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const players = await storage.getTeamPlayers(teamId);
+      const gameweek = await storage.getGameweek(team[0].gameweekId);
+      
+      res.json({
+        teamId: team[0].id,
+        teamName: team[0].teamName,
+        gameweekNumber: gameweek?.gameweekNumber || 0,
+        totalPoints: team[0].totalPoints || 0,
+        captain: players.find(p => p.isCaptain),
+        viceCaptain: players.find(p => p.isViceCaptain),
+        players: players.map(p => ({
+          playerId: p.fplPlayerId,
+          playerName: p.playerName,
+          position: p.position,
+          basePoints: p.gameweekPoints || 0,
+          captainBonus: p.isCaptain ? (p.gameweekPoints || 0) : 0,
+          totalPoints: p.isCaptain ? (p.gameweekPoints || 0) * 2 : (p.gameweekPoints || 0),
+          isCaptain: p.isCaptain,
+          isViceCaptain: p.isViceCaptain
+        }))
+      });
+    } catch (error) {
+      console.error("Error fetching team scoring breakdown:", error);
+      res.status(500).json({ error: "Failed to fetch scoring breakdown" });
     }
   });
 

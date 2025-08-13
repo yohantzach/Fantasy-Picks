@@ -25,17 +25,23 @@ export default function Navigation() {
   // Find the first team with approved payment (editable team)
   const editableTeam = userTeams.find(team => team.paymentStatus === 'approved');
 
-  const navItems = [
-    { path: "/", label: "Create Team", icon: "⚽" },
+  // Filter nav items based on user role - admins don't see team creation/editing
+  const allNavItems = [
+    { path: "/", label: "Create Team", icon: "⚽", adminHidden: true },
     { 
       path: editableTeam ? `/edit-team?team=${editableTeam.teamNumber}` : "/edit-team", 
       label: "Edit Team", 
-      icon: "✏️" 
+      icon: "✏️",
+      adminHidden: true
     },
     { path: "/leaderboard", label: "Leaderboard", icon: "🏆" },
     { path: "/fixtures", label: "Fixtures", icon: "📅" },
     { path: "/rules", label: "Rules", icon: "📋" },
   ];
+
+  const navItems = user?.isAdmin 
+    ? allNavItems.filter(item => !item.adminHidden)
+    : allNavItems;
 
   const adminNavItems = [
     { path: "/admin", label: "Admin Dashboard", icon: "⚙️" },

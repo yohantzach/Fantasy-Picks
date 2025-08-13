@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs/promises";
 import { db } from "../../db";
 import { and, eq } from "drizzle-orm";
-import { users, paymentProofs } from "@shared/schema";
+import { users, paymentProofs, teams, playerSelections } from "@shared/schema";
 
 const router = express.Router();
 
@@ -511,7 +511,7 @@ router.post("/admin/verify/:proofId", async (req, res) => {
       })
       .where(eq(paymentProofs.id, parseInt(proofId)));
 
-    // If approved, complete team creation process
+    // If approved, activate the team that was already saved to DB
     if (action === 'approve') {
       await db
         .update(users)
@@ -520,8 +520,63 @@ router.post("/admin/verify/:proofId", async (req, res) => {
       
       console.log(`Payment approved for user ${paymentProof.userId}, team number ${paymentProof.teamNumber}`);
       
-      // Note: Team will be created when user next saves their team selection
-      // The /api/team/save endpoint now checks for approved payments and creates teams automatically
+      // Find and activate the team that was saved to DB before payment
+      const teamToActivate = await db
+        .select()
+        .from(teams)
+        .where(
+          and(
+            eq(teams.userId, paymentProof.userId),
+            eq(teams.gameweekId, paymentProof.gameweekId),
+            eq(teams.teamNumber, paymentProof.teamNumber)
+          )
+        )
+        .limit(1);
+      
+      if (teamToActivate.length > 0) {
+        await db
+          .update(teams)
+          .set({ 
+            isActive: true,
+            teamId: paymentProof.teamId // Link payment to team if not already linked
+          })
+          .where(eq(teams.id, teamToActivate[0].id));
+        
+        // Update payment proof to link to team
+        await db
+          .update(paymentProofs)
+          .set({ teamId: teamToActivate[0].id })
+          .where(eq(paymentProofs.id, parseInt(proofId)));
+        
+        console.log(`Team activated for user ${paymentProof.userId}, team ID ${teamToActivate[0].id}`);
+      }
+    } else {
+      // If rejected, DELETE the team from DB
+      const teamToDelete = await db
+        .select()
+        .from(teams)
+        .where(
+          and(
+            eq(teams.userId, paymentProof.userId),
+            eq(teams.gameweekId, paymentProof.gameweekId),
+            eq(teams.teamNumber, paymentProof.teamNumber)
+          )
+        )
+        .limit(1);
+      
+      if (teamToDelete.length > 0) {
+        // Delete player selections first
+        await db
+          .delete(playerSelections)
+          .where(eq(playerSelections.teamId, teamToDelete[0].id));
+        
+        // Delete the team
+        await db
+          .delete(teams)
+          .where(eq(teams.id, teamToDelete[0].id));
+        
+        console.log(`Team deleted for user ${paymentProof.userId} due to payment rejection, team ID ${teamToDelete[0].id}`);
+      }
     }
 
     res.json({

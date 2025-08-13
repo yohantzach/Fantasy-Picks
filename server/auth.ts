@@ -38,7 +38,7 @@ export function setupAuth(app: Express) {
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 30 * 60 * 1000, // 30 minutes
     },
   };
 
@@ -74,9 +74,15 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
+      if (!user) {
+        // User not found, clear session
+        return done(null, false);
+      }
       done(null, user);
     } catch (error) {
-      done(error);
+      console.error('User deserialization error:', error);
+      // Clear session on error
+      done(null, false);
     }
   });
 
@@ -100,7 +106,7 @@ export function setupAuth(app: Express) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 30 * 60 * 1000 // 30 minutes
       });
       
       // Also set refresh token if available
@@ -152,7 +158,7 @@ export function setupAuth(app: Express) {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
-          maxAge: 24 * 60 * 60 * 1000 // 24 hours
+          maxAge: 30 * 60 * 1000 // 30 minutes
         });
         
         // Also set refresh token if available
@@ -249,7 +255,7 @@ export function setupAuth(app: Express) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 30 * 60 * 1000
       });
       
       res.cookie('refreshToken', result.newRefreshToken, {
@@ -313,6 +319,21 @@ export function setupAuth(app: Express) {
     } catch (error) {
       console.error('Revoke session error:', error);
       res.status(500).json({ error: 'Failed to revoke session' });
+    }
+  });
+
+  // Clear all sessions (debug/admin endpoint)
+  app.post("/api/admin/clear-sessions", async (req, res) => {
+    try {
+      const clearedCount = await sessionManager.clearAllSessions();
+      
+      res.json({ 
+        message: `Cleared ${clearedCount} sessions successfully`,
+        clearedCount
+      });
+    } catch (error) {
+      console.error('Clear sessions error:', error);
+      res.status(500).json({ error: 'Failed to clear sessions' });
     }
   });
 

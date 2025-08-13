@@ -89,7 +89,7 @@ export class DatabaseStorage implements IStorage {
 async createUser(insertUser: InsertUser): Promise<User> {
   const userData = {
     ...insertUser,
-    isAdmin: insertUser.email === "admin@gmail.com"
+    isAdmin: insertUser.email === "fantasypicks09@gmail.com"
   };
   
   console.log("Creating user:", userData);  // <--- add this
@@ -117,7 +117,62 @@ async createUser(insertUser: InsertUser): Promise<User> {
       .where(eq(gameweeks.isActive, true))
       .orderBy(desc(gameweeks.gameweekNumber))
       .limit(1);
-    return gameweek || undefined;
+    
+    // If no gameweek exists, try to create one using emergency logic
+    if (!gameweek) {
+      console.log('⚠️ No active gameweek found in storage, attempting to create emergency gameweek...');
+      try {
+        return await this.createEmergencyGameweek();
+      } catch (error) {
+        console.error('❌ Failed to create emergency gameweek:', error.message);
+        return undefined;
+      }
+    }
+    
+    return gameweek;
+  }
+  
+  private async createEmergencyGameweek(): Promise<Gameweek> {
+    console.log('🚨 Creating emergency gameweek with date-based estimation...');
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // 1-based month
+    const currentDay = now.getDate();
+    
+    // Determine likely gameweek based on current date (rough estimation)
+    let estimatedGameweek = 1;
+    let fallbackDeadline = new Date();
+    
+    if (currentMonth >= 8) {
+      // Season has started - estimate gameweek
+      if (currentMonth === 8) {
+        estimatedGameweek = Math.min(4, Math.max(1, Math.floor(currentDay / 7)));
+      } else if (currentMonth >= 9 && currentMonth <= 12) {
+        estimatedGameweek = 4 + ((currentMonth - 9) * 4) + Math.floor(currentDay / 7);
+      } else if (currentMonth >= 1 && currentMonth <= 5) {
+        estimatedGameweek = 20 + ((currentMonth - 1) * 4) + Math.floor(currentDay / 7);
+      }
+    }
+    
+    // Set deadline to next Saturday 11:30 AM (typical PL kickoff)
+    fallbackDeadline = new Date();
+    const daysUntilSaturday = (6 - fallbackDeadline.getDay() + 7) % 7 || 7;
+    fallbackDeadline.setDate(fallbackDeadline.getDate() + daysUntilSaturday);
+    fallbackDeadline.setHours(9, 30, 0, 0); // 11:30 AM is 09:30 UTC (roughly)
+    
+    console.log(`📅 Creating emergency GW${estimatedGameweek} with deadline: ${fallbackDeadline.toISOString()}`);
+    
+    const [gameweek] = await db
+      .insert(gameweeks)
+      .values({ 
+        gameweekNumber: estimatedGameweek, 
+        deadline: fallbackDeadline,
+        isActive: true,
+        isCompleted: false
+      })
+      .returning();
+    
+    console.log('✅ Emergency gameweek created successfully');
+    return gameweek;
   }
 
   async getGameweekByNumber(gameweekNumber: number): Promise<Gameweek | undefined> {

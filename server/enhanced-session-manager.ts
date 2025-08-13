@@ -63,13 +63,13 @@ class EnhancedSessionManager extends EventEmitter {
   };
 
   private config: SessionConfig = {
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 30 * 60 * 1000, // 30 minutes
     refreshTokenMaxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     maxSessionsPerUser: 5, // Max 5 concurrent sessions
-    requireRefresh: true,
+    requireRefresh: false, // Disable auto-refresh for strict timeout
     trackActivity: true,
     securityChecks: true,
-    autoExtend: true
+    autoExtend: false // Disable auto-extension for strict timeout
   };
 
   private analytics: SessionAnalytics = {
@@ -598,6 +598,21 @@ class EnhancedSessionManager extends EventEmitter {
 
     session.metadata = { ...session.metadata, ...metadata };
     return true;
+  }
+
+  // Clear all sessions (useful for debugging)
+  async clearAllSessions(): Promise<number> {
+    const sessionCount = this.store.sessions.size;
+    
+    // Clear all in-memory sessions
+    this.store.sessions.clear();
+    this.store.userSessions.clear();
+    this.store.refreshTokens.clear();
+    
+    console.log(`🗑️ Cleared ${sessionCount} sessions from memory`);
+    this.emit('all-sessions-cleared', { count: sessionCount });
+    
+    return sessionCount;
   }
 
   // Graceful shutdown

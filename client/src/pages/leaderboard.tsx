@@ -3,6 +3,8 @@ import Navigation from "@/components/ui/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Medal, Award, Users, Calendar, TrendingUp } from "lucide-react";
+import { EnhancedLeaderboard } from "@/components/leaderboard/enhanced-leaderboard";
+import { useAuth } from '../hooks/use-auth';
 
 type LeaderboardEntry = {
   id: number;
@@ -27,6 +29,36 @@ type PreviousWinner = {
 };
 
 export default function Leaderboard() {
+  const { user } = useAuth();
+  
+  // For admin users, show full leaderboard; for normal users, show enhanced leaderboard
+  if (user && !user.isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-purple">
+        <Navigation />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+              <Trophy className="h-8 w-8 text-fpl-green" />
+              Leaderboard & Your Performance
+            </h2>
+            <p className="text-white/60">
+              View the top 10 overall rankings and detailed breakdown of your teams
+            </p>
+          </div>
+          
+          {/* Enhanced Leaderboard Component for Normal Users */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-lg p-6">
+            <EnhancedLeaderboard />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Fallback for admin users - show the full leaderboard
   // Fetch current gameweek
   const { data: currentGameweek } = useQuery({
     queryKey: ["/api/gameweek/current"],
