@@ -285,17 +285,20 @@ export function EnhancedPlayerSelectionTable({
         </div>
       </CardHeader>
       
-      <CardContent className="p-0">
+      <CardContent className="p-0 relative">
+        {/* Horizontal scroll indicator for mobile - positioned outside scrollable area */}
+        <div className="absolute top-8 right-4 z-20 pointer-events-none md:hidden">
+          <div className="flex items-center justify-center w-10 h-10 bg-fpl-green/30 border border-fpl-green/50 rounded-full animate-bounce shadow-lg">
+            <svg className="w-5 h-5 text-fpl-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+          <div className="text-xs text-fpl-green/80 text-center mt-1 font-medium">
+            Scroll →
+          </div>
+        </div>
         <div className="max-h-[600px] overflow-y-auto">
-          <div className="relative overflow-x-auto">
-            {/* Horizontal scroll indicator for mobile */}
-            <div className="absolute top-1/2 right-2 transform -translate-y-1/2 z-10 pointer-events-none sm:hidden">
-              <div className="flex items-center justify-center w-8 h-8 bg-fpl-green/20 rounded-full animate-pulse">
-                <svg className="w-4 h-4 text-fpl-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
+          <div className="overflow-x-auto">
             <Table>
             <TableHeader className="sticky top-0 bg-slate-800/90 backdrop-blur">
               <TableRow className="border-slate-700">
