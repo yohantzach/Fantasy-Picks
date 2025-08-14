@@ -71,8 +71,7 @@ export default function AdminDashboard() {
       const gameweekParam = selectedGameweek === "current" 
         ? (currentGameweek as any)?.id 
         : selectedGameweek;
-      const response = await apiRequest("GET", `/api/admin/teams?gameweek=${gameweekParam}`);
-      const data = await response.json();
+      const data = await apiRequest("GET", `/api/admin/teams?gameweek=${gameweekParam}`);
       return Array.isArray(data) ? data : [];
     },
     enabled: !!currentGameweek,
@@ -82,8 +81,7 @@ export default function AdminDashboard() {
   const { data: allUsers = [], isLoading: usersLoading } = useQuery({
     queryKey: ["/api/admin/users"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/admin/users");
-      const data = await response.json();
+      const data = await apiRequest("GET", "/api/admin/users");
       return Array.isArray(data) ? data : [];
     }
   });

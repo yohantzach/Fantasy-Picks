@@ -54,8 +54,8 @@ export default function AdminPaymentPanel() {
   const { data: pendingProofs, isLoading } = useQuery({
     queryKey: ['admin-pending-payments'],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/payment/admin/pending");
-      return response.json();
+      const data = await apiRequest("GET", "/api/payment/admin/pending");
+      return data;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
   });

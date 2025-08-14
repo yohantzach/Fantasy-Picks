@@ -47,7 +47,7 @@ export default function ManualPaymentPage() {
     queryKey: ["/api/gameweek/current"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/gameweek/current");
-      return response.json();
+      return response;
     },
   });
 

@@ -20,7 +20,7 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return res.json(); // Parse and return JSON data instead of Response object
+  return await res.json(); // Parse and return JSON data
 }
 
 // Custom pricing function with position bonuses
