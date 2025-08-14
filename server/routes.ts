@@ -1355,14 +1355,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gameweekNumber: gameweeks.gameweekNumber
         })
         .from(paymentProofs)
-        .innerJoin(gameweeks, eq(paymentProofs.gameweekId, gameweeks.id))
+        .leftJoin(gameweeks, eq(paymentProofs.gameweekId, gameweeks.id))
         .where(eq(paymentProofs.userId, req.user!.id))
         .orderBy(desc(paymentProofs.submittedAt));
       
       // Transform to expected format
       const paymentHistory = userPayments.map(payment => ({
         id: payment.id,
-        gameweekNumber: payment.gameweekNumber,
+        gameweekNumber: payment.gameweekNumber || payment.gameweekId, // Fallback to gameweekId if gameweekNumber is null
         amount: parseFloat(payment.amount || "20"),
         status: payment.status,
         paymentMethod: payment.paymentMethod.toUpperCase(),
