@@ -414,10 +414,10 @@ export default function TeamSelection() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Formation Pitch */}
           <div className="lg:col-span-2 order-2 lg:order-1">
-            <Card>
+            <Card className="bg-white/10 border-blue-500/30 backdrop-blur-sm">
               <CardHeader className="pb-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <CardTitle className="text-lg sm:text-xl">Your Team Formation</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl text-white">Your Team Formation</CardTitle>
                   <div className="w-full sm:w-32">
                     <Select value={formation} onValueChange={handleFormationChange} disabled={isLocked}>
                       <SelectTrigger>
@@ -451,9 +451,9 @@ export default function TeamSelection() {
 
           {/* Team Overview */}
           <div className="space-y-4 lg:space-y-6 order-1 lg:order-2">
-            <Card>
+            <Card className="bg-white/10 border-blue-500/30 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Team Overview</CardTitle>
+                <CardTitle className="text-lg sm:text-xl text-white">Team Overview</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>

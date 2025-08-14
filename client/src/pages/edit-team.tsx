@@ -746,7 +746,7 @@ export default function EditTeam() {
           <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6">
             {/* Formation Pitch - Full width on mobile */}
             <div className="lg:col-span-2">
-              <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+              <Card className="bg-white/10 border-blue-500/30 backdrop-blur-sm">
                 <CardHeader className="pb-3 lg:pb-6">
                   <CardTitle className="text-white text-lg lg:text-xl">
                     Your Team Formation - Click positions to {isLocked ? 'view' : 'edit'} players
@@ -766,9 +766,9 @@ export default function EditTeam() {
 
             {/* Team Management */}
             <div className="space-y-6">
-              <Card>
+              <Card className="bg-white/10 border-blue-500/30 backdrop-blur-sm">
                 <CardHeader>
-                  <CardTitle>Team Details</CardTitle>
+                  <CardTitle className="text-white">Team Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Team Name - Always Locked for Approved Teams */}
