@@ -124,31 +124,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/teams", teamsRouter);
   
 
-  // Hybrid FPL Data endpoints with automatic fallback between FPL API and API-Football
+  // RapidAPI FPL Data endpoints for Create/Edit Team pages
   app.get("/api/fpl/players", async (req, res) => {
     try {
-      const players = await hybridFplService.getPlayers();
-      const teams = await hybridFplService.getTeams();
+      // Import and use RapidAPI FPL service directly
+      const { rapidAPIFPLService } = await import('./rapidapi-fpl-service');
       
-      // Get current gameweek fixtures with enhanced error handling
+      console.log('🎯 [FPL-PLAYERS] Using RapidAPI FPL service directly for player data');
+      
+      // Get bootstrap data which contains players, teams, and gameweek info
+      const bootstrapData = await rapidAPIFPLService.getBootstrapData();
+      const players = bootstrapData.elements || [];
+      const teams = bootstrapData.teams || [];
+      const gameweeks = bootstrapData.events || [];
+      
+      console.log(`✅ [FPL-PLAYERS] Fetched ${players.length} players and ${teams.length} teams from RapidAPI FPL`);
+      
+      // Find current gameweek from bootstrap data
+      const bootstrapGameweek = gameweeks.find(gw => gw.is_current) || gameweeks[0];
+      
+      // Get fixtures directly from RapidAPI FPL service
       let fixtures = [];
-      let currentGameweek = null;
       
       try {
-        currentGameweek = await hybridFplService.getCurrentGameweek();
-        console.log(`📊 Current gameweek: ${currentGameweek.id}`);
+        const currentGameweekData = await hybridFplService.getCurrentGameweek();
+        console.log(`📊 Current gameweek: ${currentGameweekData.id}`);
         
         // Use RapidAPI FPL service for fixture data (more reliable for current season)
         try {
           const { rapidAPIFPLService } = await import('./rapidapi-fpl-service');
-          fixtures = await rapidAPIFPLService.getFixtures(currentGameweek.id);
-          console.log(`⚽ Fetched ${fixtures.length} fixtures from RapidAPI FPL for gameweek ${currentGameweek.id}`);
+          fixtures = await rapidAPIFPLService.getFixtures(currentGameweekData.id);
+          console.log(`⚽ Fetched ${fixtures.length} fixtures from RapidAPI FPL for gameweek ${currentGameweekData.id}`);
         } catch (rapidApiError) {
           console.warn('⚠️ RapidAPI FPL failed, trying official FPL API:', rapidApiError.message);
           // Fallback to official FPL API
-          const fixturesResponse = await fetch(`https://fantasy.premierleague.com/api/fixtures/?event=${currentGameweek.id}`);
+          const fixturesResponse = await fetch(`https://fantasy.premierleague.com/api/fixtures/?event=${currentGameweekData.id}`);
           fixtures = await fixturesResponse.json();
-          console.log(`⚽ Fetched ${fixtures.length} fixtures from official FPL API for gameweek ${currentGameweek.id}`);
+          console.log(`⚽ Fetched ${fixtures.length} fixtures from official FPL API for gameweek ${currentGameweekData.id}`);
         }
         
         // Debug: Log fixture structure for first few fixtures
@@ -161,16 +173,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const { rapidAPIFPLService } = await import('./rapidapi-fpl-service');
             const allFixtures = await rapidAPIFPLService.getFixtures();
-            fixtures = allFixtures.filter(f => !f.finished && f.event === currentGameweek.id);
+            fixtures = allFixtures.filter(f => !f.finished && f.event === currentGameweekData.id);
             console.log(`⚽ Found ${fixtures.length} upcoming fixtures from RapidAPI all fixtures`);
           } catch (allFixturesError) {
             console.warn('⚠️ Could not get fixtures from any source, using hardcoded test data');
             // Add some test fixtures as last resort
             fixtures = [
-              { id: 1, team_h: 1, team_a: 2, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweek.id },
-              { id: 2, team_h: 3, team_a: 4, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweek.id },
-              { id: 3, team_h: 13, team_a: 14, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweek.id }, // MCI vs MUN
-              { id: 4, team_h: 15, team_a: 17, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweek.id } // NEW vs TOT
+              { id: 1, team_h: 1, team_a: 2, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweekData.id },
+              { id: 2, team_h: 3, team_a: 4, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweekData.id },
+              { id: 3, team_h: 13, team_a: 14, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweekData.id }, // MCI vs MUN
+              { id: 4, team_h: 15, team_a: 17, finished: false, kickoff_time: new Date(Date.now() + 86400000).toISOString(), event: currentGameweekData.id } // NEW vs TOT
             ];
             console.log(`🧪 Using ${fixtures.length} test fixtures to debug TBD issue`);
           }
