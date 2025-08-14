@@ -138,10 +138,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentGameweek = await hybridFplService.getCurrentGameweek();
         console.log(`📊 Current gameweek: ${currentGameweek.id}`);
         
-        fixtures = await hybridFplService.getFixtures(currentGameweek.id);
-        console.log(`⚽ Fetched ${fixtures.length} fixtures for gameweek ${currentGameweek.id}`);
+        // Use direct FPL API call for fixtures to ensure reliability
+        const fixturesResponse = await fetch(`https://fantasy.premierleague.com/api/fixtures/?event=${currentGameweek.id}`);
+        fixtures = await fixturesResponse.json();
+        console.log(`⚽ Fetched ${fixtures.length} fixtures from FPL API for gameweek ${currentGameweek.id}`);
+        
+        // Debug: Log fixture structure for first few fixtures
+        if (fixtures.length > 0) {
+          console.log('🔍 Sample fixture structure:', JSON.stringify(fixtures.slice(0, 2), null, 2));
+          console.log(`🏠 Sample fixture team_h values:`, fixtures.slice(0, 5).map(f => ({ id: f.id, team_h: f.team_h, team_a: f.team_a, finished: f.finished })));
+        } else {
+          console.log('⚠️ No fixtures found for current gameweek, trying all fixtures...');
+          // Fallback: get all fixtures if gameweek-specific ones are not available
+          const allFixturesResponse = await fetch('https://fantasy.premierleague.com/api/fixtures/');
+          const allFixtures = await allFixturesResponse.json();
+          fixtures = allFixtures.filter(f => !f.finished && f.event === currentGameweek.id);
+          console.log(`⚽ Found ${fixtures.length} upcoming fixtures from all fixtures`);
+        }
       } catch (error) {
-        console.warn('⚠️ Failed to fetch fixtures, players will show TBD:', error.message);
+        console.warn('⚠️ Failed to fetch fixtures from FPL API, players will show TBD:', error.message);
         fixtures = [];
       }
       
