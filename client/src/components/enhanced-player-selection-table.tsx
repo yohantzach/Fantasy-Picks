@@ -288,21 +288,20 @@ export function EnhancedPlayerSelectionTable({
       <CardContent className="p-0 relative">
         <div className="max-h-[600px] overflow-y-auto">
           <div className="overflow-x-auto relative">
-            {/* Horizontal scroll indicator for mobile - positioned next to table headers */}
-            <div className="absolute top-3 right-4 z-30 pointer-events-none md:hidden">
-              <div className="flex items-center justify-center w-8 h-8 bg-fpl-green/90 border border-fpl-green rounded-full animate-pulse shadow-lg">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-              <div className="text-xs text-fpl-green font-medium text-center mt-1 whitespace-nowrap">
-                Scroll →
-              </div>
-            </div>
             <Table>
             <TableHeader className="sticky top-0 bg-slate-800/90 backdrop-blur relative">
               <TableRow className="border-slate-700">
-                <TableHead className="text-white">Player</TableHead>
+                <TableHead className="text-white relative">
+                  Player
+                  {/* Horizontal scroll indicator for mobile - positioned in header */}
+                  <div className="absolute -right-8 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none md:hidden">
+                    <div className="flex items-center justify-center w-6 h-6 bg-fpl-green rounded-full animate-pulse">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </TableHead>
                 <TableHead className="text-white text-center">Club</TableHead>
                 <TableHead className="text-white text-center">Price</TableHead>
                 <TableHead className="text-white text-center">Points</TableHead>
