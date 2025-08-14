@@ -93,9 +93,17 @@ export default function ProfilePage() {
     queryFn: async () => {
       try {
         const result = await apiRequest("GET", "/api/user/payment-history");
+        console.log("💳 [PROFILE] Payment history API response:", result);
+        console.log("💳 [PROFILE] Payment history data type:", typeof result, "Array?", Array.isArray(result));
+        if (Array.isArray(result)) {
+          console.log("💳 [PROFILE] Payment history length:", result.length);
+          if (result.length > 0) {
+            console.log("💳 [PROFILE] First payment:", result[0]);
+          }
+        }
         return Array.isArray(result) ? result : [];
       } catch (error) {
-        console.error("Failed to fetch payment history:", error);
+        console.error("❌ [PROFILE] Failed to fetch payment history:", error);
         return [];
       }
     }

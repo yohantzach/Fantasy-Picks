@@ -10,10 +10,10 @@ import { apiUsageMonitor } from "./api-usage-monitor";
 import { sessionManager } from "./enhanced-session-manager";
 import { checkDeadlineMiddleware, requireActiveDeadline } from "./deadline-middleware";
 import { fplScoringService } from "./fpl-scoring-service";
-import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults, paymentProofs } from "@shared/schema";
+import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults, paymentProofs, gameweeks } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import teamsRouter from "./routes/teams";
 import paymentRouter from "./src/routes/payment";
 
