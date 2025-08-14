@@ -64,7 +64,7 @@ export default function AuthPage() {
       {/* Mobile Logo and Title - Shows at top on mobile only */}
       <div className="lg:hidden text-center pt-8 pb-6">
         <img 
-          src="/fantasy_logo.jpg" 
+          src="/fantasy_logo_2.jpg" 
           alt="Fantasy Picks Logo" 
           className="h-16 sm:h-20 w-auto mx-auto mb-4"
         />
@@ -300,7 +300,7 @@ export default function AuthPage() {
         <div className="hidden lg:flex flex-1 items-center justify-center p-8 bg-gradient-to-br from-fpl-purple to-purple-800">
           <div className="text-center max-w-lg">
             <img 
-              src="/fantasy_logo.jpg" 
+              src="/fantasy_logo_2.jpg" 
               alt="Fantasy Picks Logo" 
               className="h-32 xl:h-40 w-auto mx-auto mb-6"
             />
