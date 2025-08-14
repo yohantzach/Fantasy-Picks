@@ -33,6 +33,7 @@ function Router() {
   return (
     <Switch>
       <ProtectedRoute path="/" component={AdminRedirect} />
+      <ProtectedRoute path="/create-team" component={TeamSelection} />
       <ProtectedRoute path="/edit-team" component={EditTeam} />
       <ProtectedRoute path="/teams" component={Teams} />
       <ProtectedRoute path="/leaderboard" component={Leaderboard} />
