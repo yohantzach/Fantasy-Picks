@@ -1339,34 +1339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
-      const userId = req.user!.id;
-      console.log(`💳 [PAYMENT-HISTORY] Fetching payment history for user ID: ${userId}`);
-      
-      // First, check if user has any payment proofs at all
-      const allUserPayments = await db
-        .select()
-        .from(paymentProofs)
-        .where(eq(paymentProofs.userId, userId));
-      
-      console.log(`💳 [PAYMENT-HISTORY] Found ${allUserPayments.length} payment proofs for user ${userId}:`);
-      allUserPayments.forEach(payment => {
-        console.log(`  - ID: ${payment.id}, Status: ${payment.status}, GameweekId: ${payment.gameweekId}`);
-      });
-      
-      if (allUserPayments.length === 0) {
-        console.log(`💳 [PAYMENT-HISTORY] No payments found - returning empty array`);
-        return res.json([]);
-      }
-      
-      // Check gameweeks table
-      const allGameweeks = await db.select().from(gameweeks);
-      console.log(`💳 [PAYMENT-HISTORY] Found ${allGameweeks.length} gameweeks:`);
-      allGameweeks.forEach(gw => {
-        console.log(`  - ID: ${gw.id}, Number: ${gw.gameweekNumber}`);
-      });
-      
-      // Now try the JOIN query
-      console.log(`💳 [PAYMENT-HISTORY] Attempting JOIN query...`);
+      // Fetch actual payment proofs from the database
       const userPayments = await db
         .select({
           id: paymentProofs.id,
@@ -1383,10 +1356,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(paymentProofs)
         .innerJoin(gameweeks, eq(paymentProofs.gameweekId, gameweeks.id))
-        .where(eq(paymentProofs.userId, userId))
+        .where(eq(paymentProofs.userId, req.user!.id))
         .orderBy(desc(paymentProofs.submittedAt));
-      
-      console.log(`💳 [PAYMENT-HISTORY] JOIN query returned ${userPayments.length} results:`, userPayments);
       
       // Transform to expected format
       const paymentHistory = userPayments.map(payment => ({
@@ -1402,11 +1373,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: payment.notes
       }));
       
-      console.log(`💳 [PAYMENT-HISTORY] Final transformed data:`, paymentHistory);
       res.json(paymentHistory);
     } catch (error) {
-      console.error(`❌ [PAYMENT-HISTORY] Error fetching user payment history:`, error);
-      console.error(`❌ [PAYMENT-HISTORY] Error stack:`, error.stack);
+      console.error("Error fetching user payment history:", error);
       res.status(500).json({ error: "Failed to fetch payment history" });
     }
   });
