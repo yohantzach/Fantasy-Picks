@@ -785,16 +785,16 @@ export default function EditTeam() {
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Your Players ({selectedPlayers.length}/11)</div>
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                  <div className="space-y-3">
+                    <div className="text-sm font-semibold text-white">Your Players ({selectedPlayers.length}/11)</div>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
                       {selectedPlayers.map((playerId) => {
                         const player = players.find(p => p.id === playerId);
                         if (!player) return null;
                         return (
-                          <div key={playerId} className="flex justify-between items-center text-sm p-2 rounded bg-white/5">
+                          <div key={playerId} className="flex justify-between items-center text-sm p-2 rounded-lg bg-white/10 border border-white/20">
                             <div className="flex items-center gap-2">
-                              <span>{player.web_name}</span>
+                              <span className="text-white font-medium">{player.web_name}</span>
                               {captainId === playerId && (
                                 <Badge variant="secondary" className="bg-yellow-600 text-white text-xs">C</Badge>
                               )}
@@ -803,13 +803,13 @@ export default function EditTeam() {
                               )}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span>£{(player.custom_price || player.now_cost / 10).toFixed(1)}m</span>
+                              <span className="text-fpl-green font-semibold">£{(player.custom_price || player.now_cost / 10).toFixed(1)}m</span>
                               {!isLocked && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handlePlayerToggle(playerId, false)}
-                                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
+                                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                                 >
                                   ×
                                 </Button>
@@ -821,22 +821,22 @@ export default function EditTeam() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Captain</div>
+                  <div className="space-y-3">
+                    <div className="text-sm font-semibold text-white">Captain</div>
                     <Select 
                       value={captainId?.toString() || ""} 
                       onValueChange={(value) => setCaptainId(Number(value))} 
                       disabled={isLocked}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select captain" />
+                      <SelectTrigger className="bg-white/10 border-white/30 text-white">
+                        <SelectValue placeholder="Select captain" className="text-white/80" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-gray-800 border-gray-600">
                         {selectedPlayers.map((playerId) => {
                           const player = players.find(p => p.id === playerId);
                           if (!player) return null;
                           return (
-                            <SelectItem key={playerId} value={playerId.toString()}>
+                            <SelectItem key={playerId} value={playerId.toString()} className="text-white hover:bg-gray-700">
                               {player.web_name}
                             </SelectItem>
                           );
@@ -845,22 +845,22 @@ export default function EditTeam() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Vice Captain</div>
+                  <div className="space-y-3">
+                    <div className="text-sm font-semibold text-white">Vice Captain</div>
                     <Select 
                       value={viceCaptainId?.toString() || ""} 
                       onValueChange={(value) => setViceCaptainId(Number(value))} 
                       disabled={isLocked}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select vice captain" />
+                      <SelectTrigger className="bg-white/10 border-white/30 text-white">
+                        <SelectValue placeholder="Select vice captain" className="text-white/80" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-gray-800 border-gray-600">
                         {selectedPlayers.filter(id => id !== captainId).map((playerId) => {
                           const player = players.find(p => p.id === playerId);
                           if (!player) return null;
                           return (
-                            <SelectItem key={playerId} value={playerId.toString()}>
+                            <SelectItem key={playerId} value={playerId.toString()} className="text-white hover:bg-gray-700">
                               {player.web_name}
                             </SelectItem>
                           );
@@ -869,14 +869,14 @@ export default function EditTeam() {
                     </Select>
                   </div>
 
-                  <div className="border-t pt-4 space-y-2">
+                  <div className="border-t border-white/20 pt-4 space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span>Total Cost:</span>
-                      <span>£{(totalCost / 10).toFixed(1)}m</span>
+                      <span className="text-white/80 font-medium">Total Cost:</span>
+                      <span className="text-white font-semibold">£{(totalCost / 10).toFixed(1)}m</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>Budget Remaining:</span>
-                      <span className={remainingBudget >= 0 ? "text-green-400" : "text-red-400"}>
+                      <span className="text-white/80 font-medium">Budget Remaining:</span>
+                      <span className={remainingBudget >= 0 ? "text-fpl-green font-semibold" : "text-red-400 font-semibold"}>
                         £{(remainingBudget / 10).toFixed(1)}m
                       </span>
                     </div>
