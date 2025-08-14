@@ -274,14 +274,6 @@ export function EnhancedPlayerSelectionTable({
             <SortIcon column="price" />
           </Button>
           
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white/20 border-white/30 text-white cursor-default opacity-75"
-            disabled
-          >
-            Selected %
-          </Button>
         </div>
       </CardHeader>
       

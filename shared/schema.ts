@@ -152,7 +152,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
   age: true,
   gender: true,
 }).extend({
-  email: z.string().email(),
+  email: z.string()
+    .email("Please enter a valid email address")
+    .refine((email) => email.endsWith("@gmail.com"), {
+      message: "Only Gmail addresses (@gmail.com) are allowed"
+    }),
   password: z.string().min(6),
   name: z.string().min(2),
   phone: z.string().min(10, "Phone number must be at least 10 digits").max(15, "Phone number is too long"),

@@ -1339,27 +1339,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
-      // For now, we'll create mock payment history based on user teams
-      // In a real implementation, you'd have a payments table
-      const userTeams = await storage.getUserTeams(req.user!.id);
-      
-      const paymentHistory = await Promise.all(
-        userTeams.map(async (team, index) => {
-          const gameweek = await storage.getGameweek(team.gameweekId);
-          
-          return {
-            id: team.id,
-            gameweekNumber: gameweek?.gameweekNumber || 0,
-            amount: 20,
-            status: req.user!.hasPaid ? "success" : "pending",
-            paymentMethod: "Razorpay",
-            transactionId: req.user!.paymentId || `TXN${team.id}${Date.now()}`,
-            createdAt: team.createdAt
-          };
+      // Fetch actual payment proofs from the database
+      const userPayments = await db
+        .select({
+          id: paymentProofs.id,
+          gameweekId: paymentProofs.gameweekId,
+          teamNumber: paymentProofs.teamNumber,
+          paymentMethod: paymentProofs.paymentMethod,
+          transactionId: paymentProofs.transactionId,
+          amount: paymentProofs.amount,
+          status: paymentProofs.status,
+          submittedAt: paymentProofs.submittedAt,
+          verifiedAt: paymentProofs.verifiedAt,
+          notes: paymentProofs.notes,
+          gameweekNumber: gameweeks.gameweekNumber
         })
-      );
+        .from(paymentProofs)
+        .innerJoin(gameweeks, eq(paymentProofs.gameweekId, gameweeks.id))
+        .where(eq(paymentProofs.userId, req.user!.id))
+        .orderBy(desc(paymentProofs.submittedAt));
       
-      res.json(paymentHistory.sort((a, b) => b.gameweekNumber - a.gameweekNumber));
+      // Transform to expected format
+      const paymentHistory = userPayments.map(payment => ({
+        id: payment.id,
+        gameweekNumber: payment.gameweekNumber,
+        amount: parseFloat(payment.amount || "20"),
+        status: payment.status,
+        paymentMethod: payment.paymentMethod.toUpperCase(),
+        transactionId: payment.transactionId,
+        createdAt: payment.submittedAt || new Date().toISOString(),
+        verifiedAt: payment.verifiedAt,
+        teamNumber: payment.teamNumber,
+        notes: payment.notes
+      }));
+      
+      res.json(paymentHistory);
     } catch (error) {
       console.error("Error fetching user payment history:", error);
       res.status(500).json({ error: "Failed to fetch payment history" });

@@ -20,11 +20,12 @@ import {
   Smartphone
 } from "lucide-react";
 import Navigation from "@/components/ui/navigation";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
 
 export default function ManualPaymentPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
   const [paymentMethod, setPaymentMethod] = useState("");
   const [transactionId, setTransactionId] = useState("");
   const [amount, setAmount] = useState("20");
@@ -88,11 +89,16 @@ export default function ManualPaymentPage() {
     onSuccess: () => {
       toast({
         title: "Payment Proof Submitted",
-        description: "Your payment proof has been submitted for verification. You'll be notified within 24 hours.",
+        description: "Your payment proof has been submitted for verification. Redirecting to Create Team...",
       });
       setTransactionId("");
       setNotes("");
       setProofFile(null);
+      
+      // Redirect to Create Team page after a short delay to show the toast
+      setTimeout(() => {
+        setLocation("/create-team");
+      }, 1500);
     },
     onError: (error: any) => {
       toast({

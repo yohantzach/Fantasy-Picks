@@ -15,7 +15,11 @@ import { Loader2, Volleyball, Trophy, DollarSign, Target, Zap } from "lucide-rea
 import { PoliciesModal } from "@/components/ui/policies-modal";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string()
+    .email("Please enter a valid email address")
+    .refine((email) => email.endsWith("@gmail.com"), {
+      message: "Only Gmail addresses (@gmail.com) are allowed"
+    }),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -92,7 +96,7 @@ export default function AuthPage() {
                     <Input
                       {...loginForm.register("email")}
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="Enter your Gmail address"
                       className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:ring-fpl-green focus:border-fpl-green"
                     />
                     {loginForm.formState.errors.email && (
@@ -161,7 +165,7 @@ export default function AuthPage() {
                     <Input
                       {...registerForm.register("email")}
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="Enter your Gmail address"
                       className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:ring-fpl-green focus:border-fpl-green"
                     />
                     {registerForm.formState.errors.email && (
