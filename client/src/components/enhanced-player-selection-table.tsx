@@ -294,10 +294,10 @@ export function EnhancedPlayerSelectionTable({
                 <TableHead className="text-white relative">
                   Player
                   {/* Horizontal scroll indicator for mobile - positioned in header */}
-                  <div className="absolute -right-8 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none md:hidden">
-                    <div className="flex items-center justify-center w-6 h-6 bg-fpl-green rounded-full animate-pulse">
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none md:hidden">
+                    <div className="flex items-center justify-center w-7 h-7 bg-fpl-green/90 rounded-full shadow-lg animate-bounce">
+                      <svg className="w-4 h-4 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
                   </div>
