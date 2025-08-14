@@ -56,8 +56,8 @@ class APIUsageMonitor extends EventEmitter {
       },
       monthly: {
         requests: 0,
-        remaining: 500,
-        limit: 500,
+        remaining: 500000,
+        limit: 500000,
         resetDate: this.getMonthStart(),
         projectedUsage: 0
       },
@@ -73,7 +73,7 @@ class APIUsageMonitor extends EventEmitter {
     this.setupEventListeners();
     this.startPeriodicReports();
     
-    console.log('📊 API Usage Monitor initialized for Basic Plan (500 requests/month)');
+    console.log('📊 API Usage Monitor initialized for Pro Plan (500,000 requests/month)');
   }
 
   private setupEventListeners() {
@@ -214,8 +214,8 @@ class APIUsageMonitor extends EventEmitter {
       });
     }
     
-    // Daily limit check (we set conservative 15/day limit)
-    if (this.stats.daily.requests > 12) {
+    // Daily limit check for Pro plan (much higher threshold)
+    if (this.stats.daily.requests > 5000) {
       this.emit('alert', {
         type: 'daily-limit',
         message: `Daily API usage high: ${this.stats.daily.requests} requests today`,
@@ -297,7 +297,7 @@ class APIUsageMonitor extends EventEmitter {
     this.stats.traffic.concurrentUsers = Math.max(1, Math.floor(Math.random() * 50)); // Placeholder
     
     // Log current status
-    console.log(`📊 API Status - Daily: ${this.stats.daily.requests}/15, Monthly: ${this.stats.monthly.requests}/500, Cache Hit Rate: ${((this.stats.daily.cacheHits / (this.stats.daily.requests + this.stats.daily.cacheHits || 1)) * 100).toFixed(1)}%`);
+    console.log(`📊 API Status - Daily: ${this.stats.daily.requests}, Monthly: ${this.stats.monthly.requests}/500K, Cache Hit Rate: ${((this.stats.daily.cacheHits / (this.stats.daily.requests + this.stats.daily.cacheHits || 1)) * 100).toFixed(1)}%`);
   }
 
   private generateRecommendations(): string[] {
@@ -328,9 +328,9 @@ class APIUsageMonitor extends EventEmitter {
       recommendations.push('⏰ Pre-cache data before deadline periods to reduce API calls');
     }
     
-    // Conservative usage
-    if (this.stats.daily.requests > 10) {
-      recommendations.push('📉 Daily usage high - consider more aggressive caching');
+    // Usage monitoring for Pro plan
+    if (this.stats.daily.requests > 10000) {
+      recommendations.push('📉 Daily usage very high - consider more aggressive caching');
     }
     
     return recommendations;
@@ -370,8 +370,8 @@ class APIUsageMonitor extends EventEmitter {
       },
       daily: {
         used: this.stats.daily.requests,
-        limit: 15, // Our conservative daily limit
-        percentUsed: (this.stats.daily.requests / 15) * 100
+        limit: 16000, // Pro plan daily limit (500K/month ≈ 16K/day)
+        percentUsed: (this.stats.daily.requests / 16000) * 100
       },
       projected: {
         monthlyUsage: this.stats.monthly.projectedUsage,

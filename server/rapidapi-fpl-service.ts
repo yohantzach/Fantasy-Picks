@@ -99,8 +99,8 @@ class RapidAPIFPLService extends EventEmitter {
     this.config = {
       apiKey: config.apiKey || process.env.RAPIDAPI_KEY || '1ad76774bemshedd3d1cee65e951p14c61ejsn7432633e9952',
       baseUrl: config.baseUrl || 'https://fantasy-premier-league-fpl-api.p.rapidapi.com',
-      rateLimitPerMinute: config.rateLimitPerMinute || 5,  // Very conservative for Basic plan
-      rateLimitPerDay: config.rateLimitPerDay || 15,      // Very conservative daily limit (500/month)
+      rateLimitPerMinute: config.rateLimitPerMinute || 200,  // Pro plan - much higher limits
+      rateLimitPerDay: config.rateLimitPerDay || 16000,     // Pro plan - 500K/month ≈ 16K/day
       timeout: config.timeout || 15000, // 15 seconds
       ...config
     };
