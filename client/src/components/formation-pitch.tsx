@@ -72,24 +72,24 @@ export function FormationPitch({
         {positionPlayers.map((player) => (
           <div key={player.id} className="relative">
             <Card 
-              className="w-16 h-20 sm:w-18 sm:h-24 lg:w-20 lg:h-28 cursor-pointer hover:shadow-md transition-all bg-white border border-gray-300 hover:border-fpl-green active:scale-95"
+              className="w-16 h-20 sm:w-18 sm:h-24 lg:w-20 lg:h-28 cursor-pointer hover:shadow-lg transition-all bg-gray-800/90 backdrop-blur-sm border border-gray-600 hover:border-fpl-green active:scale-95 hover:bg-gray-700/90"
               onClick={() => onPositionClick(elementType)}
             >
               <CardContent className="p-0.5 sm:p-1 text-center h-full flex flex-col justify-between">
                 {/* Price on top */}
-                <div className="text-xs font-bold text-green-600">
+                <div className="text-xs font-bold text-fpl-green">
                   £{(player.custom_price || player.now_cost / 10).toFixed(1)}m
                 </div>
                 
                 {/* Player name in middle */}
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="text-xs font-semibold text-gray-800 truncate px-0.5 leading-tight">
+                  <div className="text-xs font-semibold text-white truncate px-0.5 leading-tight">
                     {player.web_name}
                   </div>
                 </div>
                 
                 {/* Fixture at bottom */}
-                <div className="text-xs text-gray-500 font-medium">
+                <div className="text-xs text-gray-300 font-medium">
                   {player.next_opponent || 'TBD'}
                 </div>
               </CardContent>
@@ -112,11 +112,11 @@ export function FormationPitch({
         {Array.from({ length: emptySlots }).map((_, index) => (
           <Card 
             key={`empty-${elementType}-${index}`}
-            className="w-16 h-20 sm:w-18 sm:h-24 lg:w-20 lg:h-28 cursor-pointer hover:shadow-md transition-all border-dashed border-2 border-gray-300 hover:border-fpl-purple bg-white/50 active:scale-95"
+            className="w-16 h-20 sm:w-18 sm:h-24 lg:w-20 lg:h-28 cursor-pointer hover:shadow-md transition-all border-dashed border-2 border-gray-500 hover:border-fpl-green bg-gray-800/50 backdrop-blur-sm active:scale-95 hover:bg-gray-700/50"
             onClick={() => onPositionClick(elementType)}
           >
             <CardContent className="p-0.5 sm:p-1 text-center h-full flex flex-col justify-center">
-              <div className="text-gray-500 text-xs font-medium">
+              <div className="text-gray-300 text-xs font-medium">
                 + {getPositionLabel(elementType)}
               </div>
             </CardContent>
