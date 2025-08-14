@@ -130,9 +130,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const players = await hybridFplService.getPlayers();
       const teams = await hybridFplService.getTeams();
       
-      // Get current gameweek fixtures
-      const currentGameweek = await hybridFplService.getCurrentGameweek();
-      const fixtures = await hybridFplService.getFixtures(currentGameweek.id);
+      // Get current gameweek fixtures with enhanced error handling
+      let fixtures = [];
+      let currentGameweek = null;
+      
+      try {
+        currentGameweek = await hybridFplService.getCurrentGameweek();
+        console.log(`📊 Current gameweek: ${currentGameweek.id}`);
+        
+        fixtures = await hybridFplService.getFixtures(currentGameweek.id);
+        console.log(`⚽ Fetched ${fixtures.length} fixtures for gameweek ${currentGameweek.id}`);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch fixtures, players will show TBD:', error.message);
+        fixtures = [];
+      }
       
       // Add team information and injury status to players
       const playersWithTeams = players.map(player => {
@@ -164,25 +175,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Find next fixture for this player's team
         let nextOpponent = 'TBD';
-        const teamFixtures = fixtures.filter(f => 
-          (f.team_h === player.team || f.team_a === player.team) && !f.finished
-        );
         
-        if (teamFixtures.length > 0) {
-          // Get the earliest upcoming fixture
-          const nextFixture = teamFixtures.sort((a, b) => 
-            new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
-          )[0];
-          
-          if (nextFixture) {
-            const isHome = nextFixture.team_h === player.team;
-            const opponentTeam = teams.find(t => 
-              t.id === (isHome ? nextFixture.team_a : nextFixture.team_h)
-            );
-            if (opponentTeam) {
-              nextOpponent = `${opponentTeam.short_name}(${isHome ? 'H' : 'A'})`;
+        try {
+          if (fixtures && fixtures.length > 0) {
+            const teamFixtures = fixtures.filter(f => {
+              // More flexible fixture matching
+              const isPlayerTeamHome = f.team_h === player.team || f.team_h_id === player.team;
+              const isPlayerTeamAway = f.team_a === player.team || f.team_a_id === player.team;
+              const isFinished = f.finished || f.finished_provisional;
+              
+              return (isPlayerTeamHome || isPlayerTeamAway) && !isFinished;
+            });
+            
+            // Debug logging for the first player to help diagnose fixture issues
+            if (player.web_name === 'Haaland' || player.web_name === 'Isak') {
+              console.log(`🔍 Debug fixture for ${player.web_name} (Team ID: ${player.team})`);
+              console.log(`📊 Total fixtures: ${fixtures.length}`);
+              console.log(`⚽ Team fixtures found: ${teamFixtures.length}`);
+              if (teamFixtures.length > 0) {
+                console.log(`🎯 Next fixture:`, JSON.stringify(teamFixtures[0], null, 2));
+              }
+            }
+            
+            if (teamFixtures.length > 0) {
+              // Get the earliest upcoming fixture
+              const nextFixture = teamFixtures.sort((a, b) => {
+                const dateA = new Date(a.kickoff_time || a.kickoff_time_utc).getTime();
+                const dateB = new Date(b.kickoff_time || b.kickoff_time_utc).getTime();
+                return dateA - dateB;
+              })[0];
+              
+              if (nextFixture) {
+                const isHome = (nextFixture.team_h === player.team || nextFixture.team_h_id === player.team);
+                const opponentId = isHome ? (nextFixture.team_a || nextFixture.team_a_id) : (nextFixture.team_h || nextFixture.team_h_id);
+                const opponentTeam = teams.find(t => t.id === opponentId);
+                
+                if (opponentTeam) {
+                  nextOpponent = `${opponentTeam.short_name}(${isHome ? 'H' : 'A'})`;
+                } else {
+                  // Fallback to team names from fixture if available
+                  if (nextFixture.team_h_short && nextFixture.team_a_short) {
+                    nextOpponent = isHome 
+                      ? `${nextFixture.team_a_short}(H)` 
+                      : `${nextFixture.team_h_short}(A)`;
+                  }
+                }
+              }
+            }
+          } else {
+            // Log when no fixtures are available
+            if (player.web_name === 'Haaland' || player.web_name === 'Isak') {
+              console.log(`⚠️ No fixtures available for ${player.web_name} - this is why TBD is showing`);
             }
           }
+        } catch (error) {
+          console.warn(`⚠️ Error processing fixture for player ${player.web_name}:`, error.message);
         }
         
         return {

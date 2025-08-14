@@ -392,6 +392,24 @@ export default function TeamSelection() {
         </Card>
       )}
 
+      {/* Formation Warning Card */}
+      <Card className="border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-1">
+                Important: Formation Cannot Be Changed
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Once you create your team and complete payment, the formation will be locked and cannot be modified. 
+                You can only change players, captain, and vice-captain after team creation. Choose your formation carefully!
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {!showPlayerTable ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Formation Pitch */}
