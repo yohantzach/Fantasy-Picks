@@ -249,8 +249,7 @@ export default function EditTeam() {
 
   const saveTeamMutation = useMutation({
     mutationFn: async (teamData: any) => {
-      const response = await apiRequest("POST", "/api/team/save", teamData);
-      return response.json();
+      return await apiRequest("POST", "/api/team/save", teamData);
     },
     onSuccess: (data: any) => {
       if (data.requiresPayment) {
@@ -531,6 +530,30 @@ export default function EditTeam() {
             </CardContent>
           </Card>
         )}
+
+        {/* Helpful Information Card */}
+        <Card className="border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-blue-600" />
+              <span className="font-medium">Having Issues?</span>
+            </div>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
+              If your teams aren't loading properly or you're experiencing issues, try <strong>refreshing the page</strong>. 
+              Sometimes it takes a moment for team data to sync properly after payment approval.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline" 
+                size="sm" 
+                className="text-blue-600 border-blue-600 hover:bg-blue-100"
+              >
+                Refresh Page
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Clean Team Selection Interface */}
         {(teamsLoading || teamLoading) ? (

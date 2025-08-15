@@ -235,8 +235,7 @@ export default function TeamSelection() {
 
   const saveTeamMutation = useMutation({
     mutationFn: async (teamData: any) => {
-      const response = await apiRequest("POST", "/api/team/save", teamData);
-      return response.json();
+      return await apiRequest("POST", "/api/team/save", teamData);
     },
     onSuccess: (data: any) => {
       console.log("Team save response:", data);

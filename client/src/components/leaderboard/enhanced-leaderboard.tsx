@@ -134,19 +134,7 @@ export function EnhancedLeaderboard() {
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
-          <CardContent className="pt-6 text-center">
-            <div className="flex flex-col items-center justify-center space-y-2">
-              <Users className="h-8 w-8 text-fpl-green mx-auto" />
-              <div>
-                <p className="text-sm text-white/60">Total Players</p>
-                <p className="text-2xl font-bold text-white">{data.totalParticipants}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="glass-card border-white/20 hover:bg-white/15 transition-colors">
           <CardContent className="pt-6 text-center">
             <div className="flex flex-col items-center justify-center space-y-2">
