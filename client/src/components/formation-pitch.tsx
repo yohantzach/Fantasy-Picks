@@ -32,6 +32,13 @@ export function FormationPitch({
       .filter(p => p && p.element_type === elementType)
       .filter(Boolean) as FPLPlayer[];
     
+    // Additional safeguard: Never return more players than formation allows
+    const maxAllowed = getPositionSlots(elementType);
+    if (filteredByPosition.length > maxAllowed) {
+      console.warn(`Formation violation detected: ${filteredByPosition.length} players in position ${elementType}, max allowed: ${maxAllowed}`);
+      return filteredByPosition.slice(0, maxAllowed);
+    }
+    
     return filteredByPosition;
   };
 
@@ -64,7 +71,7 @@ export function FormationPitch({
   const PositionRow = ({ elementType }: { elementType: number }) => {
     const positionPlayers = getPlayersByPosition(elementType);
     const totalSlots = getPositionSlots(elementType);
-    const emptySlots = totalSlots - positionPlayers.length;
+    const emptySlots = Math.max(0, totalSlots - positionPlayers.length);
 
     return (
       <div className="flex justify-center gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6 lg:mb-8">
@@ -72,7 +79,7 @@ export function FormationPitch({
         {positionPlayers.map((player) => (
           <div key={player.id} className="relative">
             <Card 
-              className="w-16 h-20 sm:w-18 sm:h-24 lg:w-20 lg:h-28 cursor-pointer hover:shadow-lg transition-all bg-gray-800/90 backdrop-blur-sm border border-gray-600 hover:border-fpl-green active:scale-95 hover:bg-gray-700/90"
+              className="player-card-responsive interactive focus-ring"
               onClick={() => onPositionClick(elementType)}
             >
               <CardContent className="p-0.5 sm:p-1 text-center h-full flex flex-col justify-between">
@@ -112,7 +119,7 @@ export function FormationPitch({
         {Array.from({ length: emptySlots }).map((_, index) => (
           <Card 
             key={`empty-${elementType}-${index}`}
-            className="w-16 h-20 sm:w-18 sm:h-24 lg:w-20 lg:h-28 cursor-pointer hover:shadow-md transition-all border-dashed border-2 border-gray-500 hover:border-fpl-green bg-gray-800/50 backdrop-blur-sm active:scale-95 hover:bg-gray-700/50"
+            className="player-card-responsive border-dashed border-2 border-gray-500 hover:border-fpl-green bg-gray-800/50 interactive focus-ring"
             onClick={() => onPositionClick(elementType)}
           >
             <CardContent className="p-0.5 sm:p-1 text-center h-full flex flex-col justify-center">

@@ -44,6 +44,26 @@ export default {
         border: "var(--border)",
         input: "var(--input)",
         ring: "var(--ring)",
+        // FPL Brand Colors
+        fpl: {
+          purple: {
+            DEFAULT: "var(--fpl-purple)",
+            light: "var(--fpl-purple-light)",
+            dark: "var(--fpl-purple-dark)",
+          },
+          green: {
+            DEFAULT: "var(--fpl-green)",
+            light: "var(--fpl-green-light)",
+            dark: "var(--fpl-green-dark)",
+          },
+          red: {
+            DEFAULT: "var(--fpl-red)",
+            light: "var(--fpl-red-light)",
+            dark: "var(--fpl-red-dark)",
+          },
+          dark: "var(--fpl-dark)",
+          light: "var(--fpl-light)",
+        },
         chart: {
           "1": "var(--chart-1)",
           "2": "var(--chart-2)",
@@ -83,6 +103,35 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fadeIn 0.5s ease-in-out",
+        "slide-up": "slideUp 0.3s ease-out",
+        "scale-in": "scaleIn 0.2s ease-out",
+        "loading": "loading 2s infinite",
+        "pulse": "pulse 2s infinite",
+      },
+      spacing: {
+        "mobile": "var(--mobile-padding)",
+        "desktop": "var(--desktop-padding)",
+        "safe-left": "env(safe-area-inset-left)",
+        "safe-right": "env(safe-area-inset-right)",
+        "safe-top": "env(safe-area-inset-top)",
+        "safe-bottom": "env(safe-area-inset-bottom)",
+      },
+      minHeight: {
+        "touch": "var(--touch-target-min)",
+        "button-sm": "var(--button-height-sm)",
+        "button-md": "var(--button-height-md)",
+        "button-lg": "var(--button-height-lg)",
+      },
+      minWidth: {
+        "touch": "var(--touch-target-min)",
+        "button-sm": "var(--button-height-sm)",
+        "button-md": "var(--button-height-md)",
+        "button-lg": "var(--button-height-lg)",
+      },
+      screens: {
+        "xs": "375px",
+        "3xl": "1600px",
       },
     },
   },
