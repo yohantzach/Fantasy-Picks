@@ -381,9 +381,9 @@ export default function EditTeam() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-green">
+    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-fpl-purple-light to-fpl-purple-dark">
       <Navigation />
-      <div className="container mx-auto p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
+      <div className="responsive-container space-y-6 padding-responsive">
         {/* Mobile-Optimized Header */}
         <div className="space-y-4">
           {/* Mobile Back Button */}

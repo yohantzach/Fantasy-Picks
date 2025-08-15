@@ -355,9 +355,9 @@ export default function TeamSelection() {
   const isLocked = currentTeam?.isLocked || isDeadlinePassed;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-purple-900 to-fpl-green">
+    <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-fpl-purple-light to-fpl-purple-dark">
       <Navigation />
-      <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="responsive-container space-y-6 padding-responsive">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
