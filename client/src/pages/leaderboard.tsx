@@ -2,9 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import Navigation from "@/components/ui/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Medal, Award, Users, Calendar, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Medal, Award, Users, Calendar, TrendingUp, BarChart3 } from "lucide-react";
 import { EnhancedLeaderboard } from "@/components/leaderboard/enhanced-leaderboard";
+import { PointsBreakdownModal } from "@/components/modals/points-breakdown-modal";
 import { useAuth } from '../hooks/use-auth';
+import { api } from '@/lib/api';
+import { useState } from 'react';
 
 type LeaderboardEntry = {
   id: number;
@@ -28,8 +32,37 @@ type PreviousWinner = {
   gameweekNumber: number;
 };
 
+type Gameweek = {
+  id: number;
+  gameweekNumber: number;
+  deadline: string;
+  isCompleted: boolean;
+};
+
 export default function Leaderboard() {
   const { user } = useAuth();
+  
+  // Points breakdown modal state
+  const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [breakdownData, setBreakdownData] = useState(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [selectedTeamName, setSelectedTeamName] = useState('');
+
+  const fetchTeamBreakdown = async (teamId: number, teamName: string, userName: string) => {
+    try {
+      setBreakdownLoading(true);
+      setSelectedTeamName(`${teamName} (${userName})`);
+      setIsBreakdownModalOpen(true);
+      
+      const response = await api.get(`/api/team/${teamId}/scoring-breakdown`);
+      setBreakdownData(response.data);
+    } catch (err) {
+      console.error('Failed to fetch team breakdown:', err);
+      setBreakdownData(null);
+    } finally {
+      setBreakdownLoading(false);
+    }
+  };
   
   // For admin users, show full leaderboard; for normal users, show enhanced leaderboard
   if (user && !user.isAdmin) {
@@ -58,18 +91,18 @@ export default function Leaderboard() {
   
   // Fallback for admin users - show the full leaderboard
   // Fetch current gameweek
-  const { data: currentGameweek } = useQuery({
+  const { data: currentGameweek } = useQuery<Gameweek>({
     queryKey: ["/api/gameweek/current"],
   });
 
   // Fetch current gameweek leaderboard
-  const { data: leaderboard = [], isLoading: leaderboardLoading } = useQuery({
+  const { data: leaderboard = [], isLoading: leaderboardLoading } = useQuery<LeaderboardEntry[]>({
     queryKey: ["/api/leaderboard", currentGameweek?.id],
     enabled: !!currentGameweek?.id,
   });
 
   // Fetch previous winners
-  const { data: previousWinners = [] } = useQuery({
+  const { data: previousWinners = [] } = useQuery<PreviousWinner[]>({
     queryKey: ["/api/leaderboard/previous-winners"],
   });
 
@@ -184,22 +217,32 @@ export default function Leaderboard() {
                         <div className="text-white/60 text-xs sm:text-sm truncate">{entry.teamName}</div>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0 ml-2">
-                      <div className={`font-bold text-lg sm:text-xl ${entry.rank === 1 ? 'text-fpl-green' : 'text-white'}`}>
-                        {entry.totalPoints} pts
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fetchTeamBreakdown(entry.teamId, entry.teamName, entry.userName)}
+                        className="text-white/70 hover:text-white hover:bg-white/10 p-2"
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                      </Button>
+                      <div className="text-right">
+                        <div className={`font-bold text-lg sm:text-xl ${entry.rank === 1 ? 'text-fpl-green' : 'text-white'}`}>
+                          {entry.totalPoints} pts
+                        </div>
+                        {entry.rank <= 3 && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs mt-1 ${
+                              entry.rank === 1 ? 'border-yellow-400 text-yellow-400' :
+                              entry.rank === 2 ? 'border-gray-400 text-gray-400' :
+                              'border-orange-400 text-orange-400'
+                            }`}
+                          >
+                            Winner
+                          </Badge>
+                        )}
                       </div>
-                      {entry.rank <= 3 && (
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs mt-1 ${
-                            entry.rank === 1 ? 'border-yellow-400 text-yellow-400' :
-                            entry.rank === 2 ? 'border-gray-400 text-gray-400' :
-                            'border-orange-400 text-orange-400'
-                          }`}
-                        >
-                          Winner
-                        </Badge>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -249,6 +292,18 @@ export default function Leaderboard() {
           </Card>
         )}
 
+        {/* Points Breakdown Modal */}
+        <PointsBreakdownModal
+          isOpen={isBreakdownModalOpen}
+          onClose={() => {
+            setIsBreakdownModalOpen(false);
+            setBreakdownData(null);
+            setSelectedTeamName('');
+          }}
+          teamBreakdown={breakdownData}
+          loading={breakdownLoading}
+          userName={selectedTeamName}
+        />
       </div>
     </div>
   );

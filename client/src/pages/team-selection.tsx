@@ -15,6 +15,22 @@ import { PlayerStatsModal } from "@/components/player-stats-modal";
 import Navigation from "@/components/ui/navigation";
 import EnhancedPaymentModal from "@/components/ui/enhanced-payment-modal";
 import { Link } from "wouter";
+import type { FPLPlayer, FPLTeam } from "@shared/schema";
+
+// Type definitions
+type Gameweek = {
+  id: number;
+  gameweekNumber: number;
+  deadline: string;
+  isCompleted: boolean;
+};
+
+type Team = {
+  id: number;
+  teamName: string;
+  isLocked: boolean;
+  paymentStatus: 'pending' | 'approved' | 'rejected';
+};
 
 
 
@@ -40,7 +56,7 @@ export default function TeamSelection() {
     
     for (const elementType of [2, 3, 4]) { // Check DEF, MID, FWD
       const currentCount = selectedPlayers.filter(id => {
-        const p = players.find(p => p.id === id);
+        const p = players.find((p: FPLPlayer) => p.id === id);
         return p?.element_type === elementType;
       }).length;
       
@@ -71,21 +87,21 @@ export default function TeamSelection() {
   };
 
   // Fetch current gameweek
-  const { data: currentGameweek } = useQuery({
+  const { data: currentGameweek } = useQuery<Gameweek>({
     queryKey: ["/api/gameweek/current"],
   });
 
   // Fetch user's current team
-  const { data: currentTeam } = useQuery({
+  const { data: currentTeam } = useQuery<Team>({
     queryKey: ["/api/team/current"],
   });
 
   // Fetch FPL data
-  const { data: players = [] } = useQuery({
+  const { data: players = [] } = useQuery<FPLPlayer[]>({
     queryKey: ["/api/fpl/players"],
   });
 
-  const { data: fplTeams = [] } = useQuery({
+  const { data: fplTeams = [] } = useQuery<FPLTeam[]>({
     queryKey: ["/api/fpl/teams"],
   });
 
@@ -100,8 +116,8 @@ export default function TeamSelection() {
   };
 
   const totalCost = useMemo(() => {
-    const selectedPlayerObjs = players.filter(p => selectedPlayers.includes(p.id));
-    return selectedPlayerObjs.reduce((sum, p) => sum + p.now_cost, 0); // Use the custom pricing from queryClient
+    const selectedPlayerObjs = players.filter((p: FPLPlayer) => selectedPlayers.includes(p.id));
+    return selectedPlayerObjs.reduce((sum: number, p: FPLPlayer) => sum + p.now_cost, 0); // Use the custom pricing from queryClient
   }, [selectedPlayers, players]);
 
   const remainingBudget = 1000 - totalCost; // 100.0m total budget
@@ -121,7 +137,7 @@ export default function TeamSelection() {
 
   // Validate team constraints
   const validatePlayerSelection = (playerId: number, isAdding: boolean, skipPositionCheck = false) => {
-    const player = players.find(p => p.id === playerId);
+    const player = players.find((p: FPLPlayer) => p.id === playerId);
     if (!player) return false;
 
     if (isAdding) {
@@ -148,7 +164,7 @@ export default function TeamSelection() {
       // Check formation-based position limits
       if (!skipPositionCheck) {
         const currentPositionCount = selectedPlayers.filter(id => {
-          const p = players.find(p => p.id === id);
+          const p = players.find((p: FPLPlayer) => p.id === id);
           return p?.element_type === player.element_type;
         }).length;
 
@@ -169,7 +185,7 @@ export default function TeamSelection() {
 
       // Check team limit (max 3 from same team)
       const sameTeamCount = selectedPlayers.filter(id => {
-        const p = players.find(p => p.id === id);
+        const p = players.find((p: FPLPlayer) => p.id === id);
         return p?.team === player.team;
       }).length;
 
@@ -187,13 +203,13 @@ export default function TeamSelection() {
   };
 
   const handlePlayerToggle = (playerId: number, isAdding: boolean) => {
-    const player = players.find(p => p.id === playerId);
+    const player = players.find((p: FPLPlayer) => p.id === playerId);
     if (!player) return;
 
     if (isAdding) {
       // Check current position count and formation limits
       const currentPositionPlayers = selectedPlayers.filter(id => {
-        const p = players.find(p => p.id === id);
+        const p = players.find((p: FPLPlayer) => p.id === id);
         return p?.element_type === player.element_type;
       });
       const maxForPosition = formationLimits[player.element_type as keyof typeof formationLimits] || 0;
@@ -214,7 +230,7 @@ export default function TeamSelection() {
         
         toast({
           title: "Player Replaced",
-          description: `${players.find(p => p.id === playerToReplace)?.web_name} replaced with ${player.web_name}`,
+          description: `${players.find((p: FPLPlayer) => p.id === playerToReplace)?.web_name} replaced with ${player.web_name}`,
         });
       } else {
         // Normal validation for adding new player
@@ -352,7 +368,58 @@ export default function TeamSelection() {
 
 
   const isDeadlinePassed = currentGameweek?.deadline ? new Date() > new Date(currentGameweek.deadline) : false;
-  const isLocked = currentTeam?.isLocked || isDeadlinePassed;
+  const isGameweekInProgress = currentGameweek && !currentGameweek.isCompleted && isDeadlinePassed;
+  const isLocked = currentTeam?.isLocked || isDeadlinePassed || isGameweekInProgress;
+
+  // Show lock screen if gameweek is in progress
+  if (isGameweekInProgress) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-fpl-purple-light to-fpl-purple-dark">
+        <Navigation />
+        <div className="responsive-container padding-responsive">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Card className="w-full max-w-lg border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+              <CardContent className="p-8 text-center">
+                <div className="mb-6">
+                  <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    Gameweek {currentGameweek.gameweekNumber} In Progress
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    Team creation and editing is locked while matches are being played.
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    You can create/edit teams again when:
+                  </p>
+                  <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    <li>• All matches finish</li>
+                    <li>• Final scores are calculated</li>
+                    <li>• Next gameweek opens</li>
+                  </ul>
+                </div>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => window.location.href = '/leaderboard'}
+                    className="w-full bg-fpl-green hover:bg-fpl-green/90 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    View Live Leaderboard
+                  </button>
+                  <button 
+                    onClick={() => window.location.href = '/fixtures'}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    View Fixtures
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-fpl-purple-light to-fpl-purple-dark">
@@ -468,13 +535,13 @@ export default function TeamSelection() {
                   <div className="text-sm font-semibold text-white">Selected Players ({selectedPlayers.length}/11)</div>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {selectedPlayers.map((playerId) => {
-                      const player = players.find(p => p.id === playerId);
+                      const player = players.find((p: FPLPlayer) => p.id === playerId);
                       if (!player) return null;
                       return (
                         <div key={playerId} className="flex justify-between items-center text-sm p-2 rounded-lg bg-white/10 border border-white/20">
                           <span className="text-white font-medium">{player.web_name}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-fpl-green font-semibold">£{(player.custom_price || player.now_cost / 10).toFixed(1)}m</span>
+                            <span className="text-fpl-green font-semibold">£{(player.now_cost / 10).toFixed(1)}m</span>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -499,7 +566,7 @@ export default function TeamSelection() {
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-600">
                       {selectedPlayers.map((playerId) => {
-                        const player = players.find(p => p.id === playerId);
+                        const player = players.find((p: FPLPlayer) => p.id === playerId);
                         if (!player) return null;
                         return (
                           <SelectItem key={playerId} value={playerId.toString()} className="text-white hover:bg-gray-700">
@@ -519,7 +586,7 @@ export default function TeamSelection() {
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-600">
                       {selectedPlayers.filter(id => id !== captainId).map((playerId) => {
-                        const player = players.find(p => p.id === playerId);
+                        const player = players.find((p: FPLPlayer) => p.id === playerId);
                         if (!player) return null;
                         return (
                           <SelectItem key={playerId} value={playerId.toString()} className="text-white hover:bg-gray-700">

@@ -10,6 +10,7 @@ import { apiUsageMonitor } from "./api-usage-monitor";
 import { sessionManager } from "./enhanced-session-manager";
 import { checkDeadlineMiddleware, requireActiveDeadline } from "./deadline-middleware";
 import { fplScoringService } from "./fpl-scoring-service";
+import { fplAPICache } from "./fpl-api-cache";
 import { insertTeamSchema, insertPlayerSelectionSchema, users, teams, playerSelections, gameweekResults, paymentProofs, gameweeks } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -1011,7 +1012,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const [updatedTeam] = await db
             .update(teams)
             .set({
-              ...teamData,
+              teamName: teamData.teamName,
+              formation: teamData.formation,
+              players: Array.isArray(teamData.players) ? teamData.players : [],
+              captainId: teamData.captainId,
+              viceCaptainId: teamData.viceCaptainId,
               teamNumber: teamNumber
             })
             .where(eq(teams.id, existingTeam[0].id))
@@ -1045,7 +1050,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [updatedTeam] = await db
           .update(teams)
           .set({
-            ...teamData,
+            teamName: teamData.teamName,
+            formation: teamData.formation,
+            players: Array.isArray(teamData.players) ? teamData.players : [],
+            captainId: teamData.captainId,
+            viceCaptainId: teamData.viceCaptainId,
             teamNumber: nextTeamNumber
           })
           .where(eq(teams.id, existingTeam[0].id))
@@ -1056,7 +1065,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [newTeam] = await db
           .insert(teams)
           .values({
-            ...teamData,
+            teamName: teamData.teamName,
+            formation: teamData.formation,
+            players: Array.isArray(teamData.players) ? teamData.players : [],
+            captainId: teamData.captainId,
+            viceCaptainId: teamData.viceCaptainId,
             userId: req.user!.id,
             gameweekId: currentGameweek.id,
             teamNumber: nextTeamNumber,
@@ -1336,7 +1349,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [updatedTeam] = await db
           .update(teams)
           .set({
-            ...teamData,
+            teamName: teamData.teamName,
+            formation: teamData.formation,
+            players: Array.isArray(teamData.players) ? teamData.players : [],
+            captainId: teamData.captainId,
+            viceCaptainId: teamData.viceCaptainId,
             teamNumber: teamNumber || 1
           })
           .where(eq(teams.id, existingTeam[0].id))
@@ -1347,7 +1364,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [newTeam] = await db
           .insert(teams)
           .values({
-            ...teamData,
+            teamName: teamData.teamName,
+            formation: teamData.formation,
+            players: Array.isArray(teamData.players) ? teamData.players : [],
+            captainId: teamData.captainId,
+            viceCaptainId: teamData.viceCaptainId,
             userId: req.user!.id,
             gameweekId: currentGameweek.id,
             teamNumber: teamNumber || 1,
@@ -1631,7 +1652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error calculating scores:", error);
-      res.status(500).json({ error: error.message || "Failed to calculate scores" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to calculate scores" });
     }
   });
 
@@ -1645,43 +1666,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid gameweek ID" });
       }
 
-      // Get top 10 teams
-      const topTeams = await storage.getGameweekLeaderboard(gameweekId, 10);
+      // Get gameweek details
+      const gameweek = await storage.getGameweek(gameweekId);
+      if (!gameweek) {
+        return res.status(404).json({ error: "Gameweek not found" });
+      }
+
+      // Get FPL players data for mapping and live data FIRST
+      const bootstrapData = await fplAPICache.getBootstrapData();
+      const fplPlayers = bootstrapData?.elements || [];
+      const elementTypesMap = new Map();
       
-      // Get user's teams for this gameweek with detailed scoring
+      if (bootstrapData && bootstrapData.element_types) {
+        bootstrapData.element_types.forEach((type: any) => {
+          elementTypesMap.set(type.id, type.singular_name_short);
+        });
+      }
+
+      // Get live gameweek data for actual points - needed for both top teams and user teams
+      const liveGameweekData = await fplAPICache.getLiveGameweekData(gameweek.gameweekNumber);
+      const liveDataMap = new Map();
+      if (liveGameweekData && liveGameweekData.elements) {
+        console.log(`📊 Loaded live data for GW${gameweek.gameweekNumber}: ${liveGameweekData.elements.length} players`);
+        liveGameweekData.elements.forEach((element: any) => {
+          liveDataMap.set(element.id, element);
+        });
+      } else {
+        console.warn(`⚠️ No live gameweek data available for GW${gameweek.gameweekNumber}`);
+      }
+
+      // Get top 10 teams and recalculate with live data
+      const topTeamsRaw = await storage.getGameweekLeaderboard(gameweekId, 10);
+      
+      // Recalculate top teams with live data for accurate points
+      const topTeamsWithLiveData = await Promise.all(
+        topTeamsRaw.map(async (topTeam) => {
+          try {
+            // Get the team data to access players array
+            const teamData = await db.select()
+              .from(teams)
+              .where(eq(teams.id, topTeam.teamId))
+              .limit(1);
+            
+            if (teamData.length === 0 || !teamData[0].players) {
+              return { ...topTeam, totalPoints: topTeam.totalPoints || 0 };
+            }
+            
+            const team = teamData[0];
+            const teamPlayers = team.players || [];
+            
+            // Calculate live total for this top team
+            let calculatedTotal = 0;
+            
+            for (const fplPlayerId of teamPlayers) {
+              const liveData = liveDataMap.get(fplPlayerId);
+              let basePoints = 0;
+              
+              if (liveData && liveData.stats && typeof liveData.stats.total_points === 'number') {
+                basePoints = liveData.stats.total_points;
+              }
+              
+              const isCaptain = fplPlayerId === team.captainId;
+              const isViceCaptain = fplPlayerId === team.viceCaptainId;
+              
+              // Apply captain logic
+              let actualPoints = basePoints;
+              if (isCaptain) {
+                actualPoints = basePoints * 2;
+              } else if (isViceCaptain) {
+                // Check if captain didn't play and vice-captain becomes effective captain
+                const captainData = liveDataMap.get(team.captainId);
+                const captainPlayedMinutes = captainData?.stats?.minutes || 0;
+                if (captainPlayedMinutes === 0 && basePoints > 0) {
+                  actualPoints = basePoints * 2;
+                }
+              }
+              
+              calculatedTotal += actualPoints;
+            }
+            
+            console.log(`📊 Top Team ${topTeam.teamName}: Calculated Total = ${calculatedTotal} (stored was ${topTeam.totalPoints})`);
+            
+            return {
+              ...topTeam,
+              totalPoints: calculatedTotal // Use live calculated total
+            };
+          } catch (error) {
+            console.error(`Error calculating live total for top team ${topTeam.teamId}:`, error);
+            return { ...topTeam, totalPoints: topTeam.totalPoints || 0 };
+          }
+        })
+      );
+      
+      // Sort top teams by calculated total points (descending) and assign correct ranks
+      const sortedTopTeams = topTeamsWithLiveData
+        .sort((a, b) => b.totalPoints - a.totalPoints)
+        .map((team, index) => ({ ...team, rank: index + 1 }));
+      
+      // Get user's teams for this gameweek - use the same method as admin dashboard
       const userTeams = await storage.getUserTeamsForGameweek(req.user!.id, gameweekId);
       
       const userTeamDetails = await Promise.all(
         userTeams.map(async (team) => {
-          const players = await storage.getTeamPlayers(team.id);
-          
           // Get user's rank from leaderboard
           const allResults = await storage.getGameweekLeaderboard(gameweekId, 1000);
           const userResult = allResults.find(r => r.teamId === team.id);
           
+          // Map team.players array to player details with real gameweek points
+          const teamPlayers = team.players || [];
+          const playerDetails = teamPlayers.map((fplPlayerId: number) => {
+            const fplPlayer = fplPlayers.find((p: any) => p.id === fplPlayerId);
+            const liveData = liveDataMap.get(fplPlayerId);
+            
+            if (!fplPlayer) {
+              return {
+                playerId: fplPlayerId,
+                playerName: `Player ${fplPlayerId}`,
+                position: 'Unknown',
+                points: 0,
+                isCaptain: fplPlayerId === team.captainId,
+                isViceCaptain: fplPlayerId === team.viceCaptainId,
+                actualPoints: 0
+              };
+            }
+            
+            // Get position name from element types
+            const positionName = elementTypesMap.get(fplPlayer.element_type) || 'Unknown';
+            
+            // Get actual gameweek points from live data - this is the key mapping
+            let basePoints = 0;
+            if (liveData && liveData.stats && typeof liveData.stats.total_points === 'number') {
+              basePoints = liveData.stats.total_points;
+              console.log(`✅ Player ${fplPlayer.web_name} (ID: ${fplPlayerId}) has ${basePoints} points from live data`);
+            } else {
+              console.warn(`❌ No live data found for player ${fplPlayerId} (${fplPlayer.web_name || 'Unknown'})`);
+              console.log(`Live data available:`, !!liveData, `Stats available:`, !!liveData?.stats, `Total points:`, liveData?.stats?.total_points);
+            }
+            
+            const isCaptain = fplPlayerId === team.captainId;
+            const isViceCaptain = fplPlayerId === team.viceCaptainId;
+            
+            // Apply captain logic
+            let actualPoints = basePoints;
+            if (isCaptain) {
+              actualPoints = basePoints * 2;
+            } else if (isViceCaptain) {
+              // Check if captain didn't play and vice-captain becomes effective captain
+              const captainData = liveDataMap.get(team.captainId);
+              const captainPlayedMinutes = captainData?.stats?.minutes || 0;
+              if (captainPlayedMinutes === 0 && basePoints > 0) {
+                actualPoints = basePoints * 2; // Vice-captain becomes effective captain
+              }
+            }
+            
+            return {
+              playerId: fplPlayerId,
+              playerName: fplPlayer.web_name || `${fplPlayer.first_name} ${fplPlayer.second_name}`,
+              position: positionName,
+              points: basePoints,
+              isCaptain,
+              isViceCaptain,
+              actualPoints
+            };
+          });
+
+          // Calculate actual team total from live data
+          const calculatedTotal = playerDetails.reduce((sum, player) => sum + player.actualPoints, 0);
+          console.log(`📊 Team ${team.teamName}: Total = ${calculatedTotal} (${playerDetails.map(p => `${p.playerName}:${p.actualPoints}`).join(', ')})`);
+          
           return {
             teamId: team.id,
             teamName: team.teamName,
-            totalPoints: team.totalPoints || 0,
+            totalPoints: calculatedTotal, // Use calculated total instead of stored total
             rank: userResult?.rank || 0,
-            players: players.map(p => ({
-              playerId: p.fplPlayerId,
-              playerName: p.playerName,
-              position: p.position,
-              points: p.gameweekPoints || 0,
-              isCaptain: p.isCaptain,
-              isViceCaptain: p.isViceCaptain,
-              actualPoints: p.isCaptain ? (p.gameweekPoints || 0) * 2 : (p.gameweekPoints || 0)
-            }))
+            players: playerDetails
           };
         })
       );
 
       res.json({
-        topTeams,
+        topTeams: sortedTopTeams,
         userTeams: userTeamDetails,
         gameweekId,
-        totalParticipants: topTeams.length > 0 ? Math.max(...topTeams.map(t => t.rank || 0)) : 0
+        totalParticipants: sortedTopTeams.length > 0 ? Math.max(...sortedTopTeams.map(t => t.rank || 0)) : 0
+      });
+      
+      // Debug: Log the response data being sent to frontend
+      console.log('🔍 [BACKEND] Enhanced leaderboard response being sent:', {
+        topTeamsPoints: sortedTopTeams.map(t => ({ 
+          teamName: t.teamName, 
+          userName: t.userName, 
+          totalPoints: t.totalPoints, 
+          rank: t.rank 
+        })),
+        userTeamsPoints: userTeamDetails.map(t => ({ 
+          teamName: t.teamName, 
+          totalPoints: t.totalPoints, 
+          rank: t.rank 
+        }))
       });
     } catch (error) {
       console.error("Error fetching enhanced leaderboard:", error);
@@ -1689,7 +1871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get detailed team scoring breakdown
+  // Get detailed team scoring breakdown with FPL stats
   app.get("/api/team/:teamId/scoring-breakdown", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
@@ -1709,33 +1891,409 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (team[0].userId !== req.user!.id && !req.user!.isAdmin) {
         return res.status(403).json({ error: "Access denied" });
       }
+
+      const teamData = team[0];
       
-      const players = await storage.getTeamPlayers(teamId);
-      const gameweek = await storage.getGameweek(team[0].gameweekId);
+      if (!teamData.gameweekId) {
+        return res.status(404).json({ error: "Team gameweek not found" });
+      }
+      
+      const gameweek = await storage.getGameweek(teamData.gameweekId);
+      
+      if (!gameweek) {
+        return res.status(404).json({ error: "Gameweek not found" });
+      }
+
+      console.log(`Fetching breakdown for team ${teamId}, gameweek ${gameweek.gameweekNumber}`);
+
+      // Get player details from bootstrap data for display
+      const bootstrapData = await fplAPICache.getBootstrapData();
+      const playerDetailsMap = new Map();
+      const elementTypesMap = new Map();
+      
+      if (bootstrapData && bootstrapData.elements) {
+        bootstrapData.elements.forEach((player: any) => {
+          playerDetailsMap.set(player.id, player);
+        });
+      }
+      
+      if (bootstrapData && bootstrapData.element_types) {
+        bootstrapData.element_types.forEach((type: any) => {
+          elementTypesMap.set(type.id, type.singular_name_short);
+        });
+      }
+
+      // Get live data for actual gameweek points
+      const liveGameweekData = await fplAPICache.getLiveGameweekData(gameweek.gameweekNumber);
+      const liveDataMap = new Map();
+      if (liveGameweekData && liveGameweekData.elements) {
+        liveGameweekData.elements.forEach((element: any) => {
+          liveDataMap.set(element.id, element);
+        });
+      }
+
+      // Process each player from the team's players array
+      const playersWithScores = teamData.players.map((playerId: number) => {
+        const playerDetails = playerDetailsMap.get(playerId);
+        const liveData = liveDataMap.get(playerId);
+        const position = elementTypesMap.get(playerDetails?.element_type) || 'FWD';
+        
+        // Get base points from live gameweek data (this is the actual FPL points for this gameweek)
+        let basePoints = 0;
+        let detailedStats = {
+          minutes: 0,
+          goals_scored: 0,
+          assists: 0,
+          clean_sheets: 0,
+          goals_conceded: 0,
+          yellow_cards: 0,
+          red_cards: 0,
+          saves: 0,
+          bonus: 0,
+          own_goals: 0,
+          penalties_saved: 0,
+          penalties_missed: 0
+        };
+        
+        if (liveData && liveData.stats && typeof liveData.stats.total_points === 'number') {
+          // Use the official FPL total_points for this gameweek
+          basePoints = liveData.stats.total_points;
+          console.log(`✅ Breakdown - Player ${playerDetails?.web_name} (ID: ${playerId}) has ${basePoints} points from live data`);
+          detailedStats = {
+            minutes: liveData.stats.minutes || 0,
+            goals_scored: liveData.stats.goals_scored || 0,
+            assists: liveData.stats.assists || 0,
+            clean_sheets: liveData.stats.clean_sheets || 0,
+            goals_conceded: liveData.stats.goals_conceded || 0,
+            yellow_cards: liveData.stats.yellow_cards || 0,
+            red_cards: liveData.stats.red_cards || 0,
+            saves: liveData.stats.saves || 0,
+            bonus: liveData.stats.bonus || 0,
+            own_goals: liveData.stats.own_goals || 0,
+            penalties_saved: liveData.stats.penalties_saved || 0,
+            penalties_missed: liveData.stats.penalties_missed || 0
+          };
+        } else {
+          console.warn(`❌ Breakdown - No live data found for player ${playerId} (${playerDetails?.web_name || 'Unknown'})`);
+        }
+
+        // Apply captain logic
+        const isCaptain = playerId === teamData.captainId;
+        const isViceCaptain = playerId === teamData.viceCaptainId;
+        
+        // Captain gets double points (only if they played)
+        let finalPoints = basePoints;
+        let captainBonus = 0;
+        let actualCaptain = false;
+        
+        if (isCaptain && basePoints > 0) {
+          finalPoints = basePoints * 2;
+          captainBonus = basePoints;
+          actualCaptain = true;
+        } else if (isCaptain && basePoints === 0 && isViceCaptain && liveDataMap.get(teamData.viceCaptainId)?.stats?.total_points > 0) {
+          // If captain didn't play but vice-captain did, vice-captain becomes effective captain
+          const viceData = liveDataMap.get(teamData.viceCaptainId);
+          if (viceData && playerId === teamData.viceCaptainId) {
+            const vicePoints = viceData.stats.total_points || 0;
+            finalPoints = vicePoints * 2;
+            captainBonus = vicePoints;
+            actualCaptain = true;
+          }
+        }
+
+        // Calculate point breakdown for display
+        const pointBreakdown = calculateDetailedPointBreakdown(detailedStats, position);
+        
+        return {
+          playerId: playerId,
+          playerName: playerDetails?.web_name || `Player ${playerId}`,
+          position: position,
+          basePoints: basePoints,
+          captainBonus: captainBonus,
+          totalPoints: finalPoints,
+          isCaptain: isCaptain,
+          isViceCaptain: isViceCaptain,
+          actualCaptain: actualCaptain,
+          stats: detailedStats,
+          pointBreakdown: pointBreakdown
+        };
+      });
+
+      // Calculate team total points
+      const totalPoints = playersWithScores.reduce((sum, player) => sum + player.totalPoints, 0);
+      
+      console.log(`Successfully processed ${playersWithScores.length} players for team breakdown`);
       
       res.json({
         teamId: team[0].id,
         teamName: team[0].teamName,
-        gameweekNumber: gameweek?.gameweekNumber || 0,
-        totalPoints: team[0].totalPoints || 0,
-        captain: players.find(p => p.isCaptain),
-        viceCaptain: players.find(p => p.isViceCaptain),
-        players: players.map(p => ({
-          playerId: p.fplPlayerId,
-          playerName: p.playerName,
-          position: p.position,
-          basePoints: p.gameweekPoints || 0,
-          captainBonus: p.isCaptain ? (p.gameweekPoints || 0) : 0,
-          totalPoints: p.isCaptain ? (p.gameweekPoints || 0) * 2 : (p.gameweekPoints || 0),
-          isCaptain: p.isCaptain,
-          isViceCaptain: p.isViceCaptain
-        }))
+        gameweekNumber: gameweek.gameweekNumber,
+        totalPoints: totalPoints,
+        captain: playersWithScores.find(p => p.isCaptain),
+        viceCaptain: playersWithScores.find(p => p.isViceCaptain),
+        players: playersWithScores
       });
     } catch (error) {
       console.error("Error fetching team scoring breakdown:", error);
       res.status(500).json({ error: "Failed to fetch scoring breakdown" });
     }
   });
+
+  // Get FPL API cache statistics (admin only)
+  app.get("/api/admin/fpl-cache-stats", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user!.isAdmin) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const cacheStats = fplAPICache.getCacheStats();
+      res.json(cacheStats);
+    } catch (error) {
+      console.error("Error fetching cache stats:", error);
+      res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+
+  // Clear FPL API cache (admin only)
+  app.post("/api/admin/clear-fpl-cache", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user!.isAdmin) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      fplAPICache.clearCache();
+      res.json({ success: true, message: "FPL API cache cleared" });
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+      res.status(500).json({ error: "Failed to clear cache" });
+    }
+  });
+
+  // Debug endpoint to check FPL player mapping
+  app.get("/api/debug/fpl-mapping/:gameweekId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const gameweekId = parseInt(req.params.gameweekId);
+      
+      // Get current gameweek from storage
+      const gameweek = await storage.getGameweek(gameweekId);
+      if (!gameweek) {
+        return res.status(404).json({ error: "Gameweek not found" });
+      }
+
+      // Get bootstrap data (static player info)
+      const bootstrapData = await fplAPICache.getBootstrapData();
+      console.log("Bootstrap data sample:", {
+        totalElements: bootstrapData?.elements?.length || 0,
+        firstPlayer: bootstrapData?.elements?.[0] || null,
+        elementTypes: bootstrapData?.element_types?.map((t: any) => ({ id: t.id, name: t.singular_name_short })) || []
+      });
+
+      // Get live gameweek data
+      const liveData = await fplAPICache.getLiveGameweekData(gameweek.gameweekNumber);
+      console.log("Live data sample:", {
+        totalElements: liveData?.elements?.length || 0,
+        firstElement: liveData?.elements?.[0] || null,
+        sampleStats: liveData?.elements?.[0]?.stats || null
+      });
+
+      // Get a sample team to test mapping
+      const userTeams = await storage.getUserTeamsForGameweek(req.user!.id, gameweekId);
+      let sampleTeam = null;
+      let mappingTest = null;
+
+      if (userTeams.length > 0) {
+        sampleTeam = userTeams[0];
+        const playerIds = sampleTeam.players || [];
+        
+        mappingTest = playerIds.slice(0, 3).map((fplId: number) => {
+          const bootstrapPlayer = bootstrapData?.elements?.find((p: any) => p.id === fplId);
+          const liveElement = liveData?.elements?.find((e: any) => e.id === fplId);
+          
+          return {
+            fplId: fplId,
+            bootstrapFound: !!bootstrapPlayer,
+            bootstrapName: bootstrapPlayer?.web_name || 'Not found',
+            liveFound: !!liveElement,
+            livePoints: liveElement?.stats?.total_points || 0,
+            liveStats: liveElement?.stats || null
+          };
+        });
+      }
+
+      res.json({
+        gameweek: {
+          id: gameweek.id,
+          number: gameweek.gameweekNumber
+        },
+        bootstrap: {
+          available: !!bootstrapData,
+          playerCount: bootstrapData?.elements?.length || 0,
+          samplePlayer: bootstrapData?.elements?.[0] || null
+        },
+        liveData: {
+          available: !!liveData,
+          elementCount: liveData?.elements?.length || 0,
+          sampleElement: liveData?.elements?.[0] || null
+        },
+        sampleTeam: sampleTeam ? {
+          teamId: sampleTeam.id,
+          teamName: sampleTeam.teamName,
+          playerCount: sampleTeam.players?.length || 0,
+          playerIds: sampleTeam.players || []
+        } : null,
+        mappingTest: mappingTest
+      });
+    } catch (error) {
+      console.error("Error in debug mapping:", error);
+      res.status(500).json({ error: "Failed to debug mapping", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Helper function to calculate detailed point breakdown
+  function calculateDetailedPointBreakdown(stats: any, position: string) {
+    const breakdown = [];
+    
+    // Minutes played
+    if (stats.minutes > 0) {
+      const points = stats.minutes >= 60 ? 2 : 1;
+      breakdown.push({
+        category: 'Minutes played',
+        value: stats.minutes,
+        points: points,
+        description: stats.minutes >= 60 ? '60+ minutes' : 'Less than 60 minutes'
+      });
+    }
+
+    // Goals scored
+    if (stats.goals_scored > 0) {
+      let pointsPerGoal = 4; // Default for forwards
+      if (position === 'GKP' || position === 'DEF') pointsPerGoal = 6;
+      else if (position === 'MID') pointsPerGoal = 5;
+      
+      breakdown.push({
+        category: 'Goals scored',
+        value: stats.goals_scored,
+        points: stats.goals_scored * pointsPerGoal,
+        description: `${stats.goals_scored} goal${stats.goals_scored > 1 ? 's' : ''} (${pointsPerGoal} pts each)`
+      });
+    }
+
+    // Assists
+    if (stats.assists > 0) {
+      breakdown.push({
+        category: 'Assists',
+        value: stats.assists,
+        points: stats.assists * 3,
+        description: `${stats.assists} assist${stats.assists > 1 ? 's' : ''} (3 pts each)`
+      });
+    }
+
+    // Clean sheets
+    if (stats.clean_sheets > 0) {
+      let points = 0;
+      if (position === 'GKP' || position === 'DEF') points = stats.clean_sheets * 4;
+      else if (position === 'MID') points = stats.clean_sheets * 1;
+      
+      if (points > 0) {
+        breakdown.push({
+          category: 'Clean sheets',
+          value: stats.clean_sheets,
+          points: points,
+          description: `${stats.clean_sheets} clean sheet${stats.clean_sheets > 1 ? 's' : ''}`
+        });
+      }
+    }
+
+    // Goals conceded (negative points)
+    if (stats.goals_conceded > 0 && (position === 'GKP' || position === 'DEF')) {
+      const points = -Math.floor(stats.goals_conceded / 2);
+      if (points < 0) {
+        breakdown.push({
+          category: 'Goals conceded',
+          value: stats.goals_conceded,
+          points: points,
+          description: `${stats.goals_conceded} goal${stats.goals_conceded > 1 ? 's' : ''} conceded (-1 per 2 goals)`
+        });
+      }
+    }
+
+    // Penalties saved
+    if (stats.penalties_saved > 0 && position === 'GKP') {
+      breakdown.push({
+        category: 'Penalties saved',
+        value: stats.penalties_saved,
+        points: stats.penalties_saved * 5,
+        description: `${stats.penalties_saved} penalty${stats.penalties_saved > 1 ? ' saves' : ' save'} (5 pts each)`
+      });
+    }
+
+    // Penalties missed (negative)
+    if (stats.penalties_missed > 0) {
+      breakdown.push({
+        category: 'Penalties missed',
+        value: stats.penalties_missed,
+        points: stats.penalties_missed * -2,
+        description: `${stats.penalties_missed} penalty${stats.penalties_missed > 1 ? ' misses' : ' miss'} (-2 pts each)`
+      });
+    }
+
+    // Yellow cards
+    if (stats.yellow_cards > 0) {
+      breakdown.push({
+        category: 'Yellow cards',
+        value: stats.yellow_cards,
+        points: stats.yellow_cards * -1,
+        description: `${stats.yellow_cards} yellow card${stats.yellow_cards > 1 ? 's' : ''} (-1 pt each)`
+      });
+    }
+
+    // Red cards
+    if (stats.red_cards > 0) {
+      breakdown.push({
+        category: 'Red cards',
+        value: stats.red_cards,
+        points: stats.red_cards * -3,
+        description: `${stats.red_cards} red card${stats.red_cards > 1 ? 's' : ''} (-3 pts each)`
+      });
+    }
+
+    // Own goals
+    if (stats.own_goals > 0) {
+      breakdown.push({
+        category: 'Own goals',
+        value: stats.own_goals,
+        points: stats.own_goals * -2,
+        description: `${stats.own_goals} own goal${stats.own_goals > 1 ? 's' : ''} (-2 pts each)`
+      });
+    }
+
+    // Saves (GKP only)
+    if (stats.saves > 0 && position === 'GKP') {
+      const points = Math.floor(stats.saves / 3);
+      if (points > 0) {
+        breakdown.push({
+          category: 'Saves',
+          value: stats.saves,
+          points: points,
+          description: `${stats.saves} saves (1 pt per 3 saves)`
+        });
+      }
+    }
+
+    // Bonus points
+    if (stats.bonus > 0) {
+      breakdown.push({
+        category: 'Bonus points',
+        value: stats.bonus,
+        points: stats.bonus,
+        description: `${stats.bonus} bonus point${stats.bonus > 1 ? 's' : ''}`
+      });
+    }
+
+    return breakdown;
+  }
 
   const httpServer = createServer(app);
   return httpServer;

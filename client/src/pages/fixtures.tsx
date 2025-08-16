@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import Navigation from "@/components/ui/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { Calendar, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 type Fixture = {
@@ -10,8 +10,8 @@ type Fixture = {
   event: number;
   team_h: number;
   team_a: number;
-  team_h_difficulty: number;
-  team_a_difficulty: number;
+  team_h_score: number | null;
+  team_a_score: number | null;
   kickoff_time: string;
   finished: boolean;
   finished_provisional: boolean;
@@ -32,38 +32,6 @@ export default function Fixtures() {
     queryKey: ["/api/fpl/fixtures", currentGameweek?.gameweekNumber],
     enabled: !!currentGameweek?.gameweekNumber,
   });
-
-  const getDifficultyColor = (difficulty: number) => {
-    switch (difficulty) {
-      case 1:
-      case 2:
-        return "bg-green-500";
-      case 3:
-        return "bg-yellow-500";
-      case 4:
-      case 5:
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getDifficultyText = (difficulty: number) => {
-    switch (difficulty) {
-      case 1:
-        return "Very Easy";
-      case 2:
-        return "Easy";
-      case 3:
-        return "Average";
-      case 4:
-        return "Hard";
-      case 5:
-        return "Very Hard";
-      default:
-        return "Unknown";
-    }
-  };
 
   const formatKickoffTime = (kickoffTime: string) => {
     try {
@@ -121,7 +89,7 @@ export default function Fixtures() {
             Gameweek {currentGameweek?.gameweekNumber || "21"} Fixtures
           </h2>
           <p className="text-white/60">
-            Plan your team selection based on fixture difficulty ratings
+            View fixture results and upcoming match schedules
           </p>
         </div>
 
@@ -136,7 +104,7 @@ export default function Fixtures() {
           </Card>
           <Card className="glass-card border-white/20">
             <CardContent className="p-4 text-center">
-              <TrendingUp className="h-8 w-8 text-fpl-green mx-auto mb-2" />
+              <Calendar className="h-8 w-8 text-fpl-green mx-auto mb-2" />
               <div className="text-2xl font-bold text-white">
                 {fixtures.filter(f => f.finished).length}
               </div>
@@ -205,18 +173,23 @@ export default function Fixtures() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-6 h-6 rounded text-xs flex items-center justify-center text-white font-bold ${getDifficultyColor(fixture.team_h_difficulty)}`}
-                                    title={`Difficulty: ${getDifficultyText(fixture.team_h_difficulty)}`}
-                                  >
-                                    {fixture.team_h_difficulty}
-                                  </div>
+                                  {fixture.finished && fixture.team_h_score !== null ? (
+                                    <div className="w-8 h-8 rounded-full bg-fpl-green flex items-center justify-center text-white font-bold text-sm">
+                                      {fixture.team_h_score}
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
 
-                              {/* VS Divider */}
+                              {/* Score/VS Divider */}
                               <div className="text-center text-white/40 text-xs font-medium">
-                                VS
+                                {fixture.finished && fixture.team_h_score !== null && fixture.team_a_score !== null ? (
+                                  <div className="text-white text-lg font-bold">
+                                    {fixture.team_h_score} - {fixture.team_a_score}
+                                  </div>
+                                ) : (
+                                  "VS"
+                                )}
                               </div>
 
                               {/* Away Team */}
@@ -233,12 +206,11 @@ export default function Fixtures() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-6 h-6 rounded text-xs flex items-center justify-center text-white font-bold ${getDifficultyColor(fixture.team_a_difficulty)}`}
-                                    title={`Difficulty: ${getDifficultyText(fixture.team_a_difficulty)}`}
-                                  >
-                                    {fixture.team_a_difficulty}
-                                  </div>
+                                  {fixture.finished && fixture.team_a_score !== null ? (
+                                    <div className="w-8 h-8 rounded-full bg-fpl-green flex items-center justify-center text-white font-bold text-sm">
+                                      {fixture.team_a_score}
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
@@ -254,7 +226,7 @@ export default function Fixtures() {
         ) : (
           <Card className="glass-card border-white/20">
             <CardContent className="p-12 text-center">
-              <AlertCircle className="h-16 w-16 text-white/30 mx-auto mb-4" />
+              <Clock className="h-16 w-16 text-white/30 mx-auto mb-4" />
               <div className="text-white/60 text-lg mb-2">No fixtures available</div>
               <p className="text-white/40 text-sm">
                 Fixtures will be loaded from the FPL API when available
@@ -262,49 +234,6 @@ export default function Fixtures() {
             </CardContent>
           </Card>
         )}
-
-        {/* Fixture Difficulty Legend */}
-        <Card className="glass-card border-white/20 mt-8">
-          <CardContent className="p-6">
-            <h3 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-fpl-green" />
-              Fixture Difficulty Rating (FDR) Guide
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-              {[
-                { rating: 1, label: "Very Easy", color: "bg-green-500" },
-                { rating: 2, label: "Easy", color: "bg-green-500" },
-                { rating: 3, label: "Average", color: "bg-yellow-500" },
-                { rating: 4, label: "Hard", color: "bg-red-500" },
-                { rating: 5, label: "Very Hard", color: "bg-red-500" },
-              ].map((item) => (
-                <div key={item.rating} className="flex items-center gap-3">
-                  <div
-                    className={`w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm ${item.color}`}
-                  >
-                    {item.rating}
-                  </div>
-                  <div>
-                    <div className="text-white font-medium text-sm">{item.label}</div>
-                    <div className="text-white/60 text-xs">FDR {item.rating}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
-              <h4 className="text-blue-200 font-medium mb-2 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                How to Use FDR
-              </h4>
-              <div className="text-blue-200/80 text-sm space-y-1">
-                <p>• Lower ratings (1-2) indicate easier fixtures for attacking returns</p>
-                <p>• Higher ratings (4-5) suggest difficult matches but potential for defensive points</p>
-                <p>• Consider FDR when selecting players, especially for captaincy decisions</p>
-                <p>• FDR is based on team form, home/away record, and opponent strength</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

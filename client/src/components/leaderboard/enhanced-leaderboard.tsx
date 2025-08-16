@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { api } from '@/lib/api';
-import { Trophy, Users, TrendingUp, Star } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Star, BarChart3 } from 'lucide-react';
+import { PointsBreakdownModal } from '../modals/points-breakdown-modal';
 
 interface Player {
   playerId: number;
@@ -44,6 +45,12 @@ export function EnhancedLeaderboard() {
   const [error, setError] = useState<string | null>(null);
   const [selectedUserTeam, setSelectedUserTeam] = useState<UserTeam | null>(null);
   const [gameweekId, setGameweekId] = useState<number | null>(null);
+  
+  // Points breakdown modal state
+  const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [breakdownData, setBreakdownData] = useState(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [selectedTeamName, setSelectedTeamName] = useState('');
 
   useEffect(() => {
     fetchCurrentGameweek();
@@ -69,6 +76,22 @@ export function EnhancedLeaderboard() {
     try {
       setLoading(true);
       const response = await api.get(`/api/leaderboard/enhanced/${gw}`);
+      
+      // Debug: Log the received data to see actual point values
+      console.log('🔍 [FRONTEND] Enhanced leaderboard data received:', {
+        topTeams: response.data.topTeams?.map((team: any) => ({
+          teamName: team.teamName,
+          userName: team.userName,
+          totalPoints: team.totalPoints,
+          rank: team.rank
+        })),
+        userTeams: response.data.userTeams?.map((team: any) => ({
+          teamName: team.teamName,
+          totalPoints: team.totalPoints,
+          rank: team.rank
+        }))
+      });
+      
       setData(response.data);
       
       // Auto-select first user team if available
@@ -79,6 +102,22 @@ export function EnhancedLeaderboard() {
       setError('Failed to fetch leaderboard data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTeamBreakdown = async (teamId: number, teamName: string) => {
+    try {
+      setBreakdownLoading(true);
+      setSelectedTeamName(teamName);
+      setIsBreakdownModalOpen(true);
+      
+      const response = await api.get(`/api/team/${teamId}/scoring-breakdown`);
+      setBreakdownData(response.data);
+    } catch (err) {
+      console.error('Failed to fetch team breakdown:', err);
+      setBreakdownData(null);
+    } finally {
+      setBreakdownLoading(false);
     }
   };
 
@@ -200,11 +239,22 @@ export function EnhancedLeaderboard() {
                       <p className="text-xs sm:text-sm text-white/60 truncate">by {team.userName}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className={`font-bold text-xs sm:text-sm flex-shrink-0 ml-2 ${
-                    team.rank === 1 ? 'border-fpl-green text-fpl-green' : 'border-white/40 text-white'
-                  }`}>
-                    {team.totalPoints} pts
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fetchTeamBreakdown(team.teamId, `${team.teamName} (${team.userName})`)}
+                      className="text-white/70 hover:text-white hover:bg-white/10 p-2"
+                      title="View detailed breakdown"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                    </Button>
+                    <Badge variant="outline" className={`font-bold text-xs sm:text-sm flex-shrink-0 ${
+                      team.rank === 1 ? 'border-fpl-green text-fpl-green bg-fpl-green/10' : 'border-white/40 text-white'
+                    }`}>
+                      {team.totalPoints} pts
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -232,15 +282,17 @@ export function EnhancedLeaderboard() {
                 {data.userTeams.map((team) => (
                   <div
                     key={team.teamId}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    className={`p-3 rounded-lg border transition-colors ${
                       selectedUserTeam?.teamId === team.teamId
                         ? 'bg-fpl-green/20 border-fpl-green/40'
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
                     }`}
-                    onClick={() => setSelectedUserTeam(team)}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => setSelectedUserTeam(team)}
+                      >
                         <p className="font-medium text-white">{team.teamName}</p>
                         <div className="flex items-center gap-2 text-sm text-white/60">
                           <span>Rank: #{team.rank}</span>
@@ -248,13 +300,24 @@ export function EnhancedLeaderboard() {
                           <span>{team.totalPoints} pts</span>
                         </div>
                       </div>
-                      <Badge variant="outline" className={`${
-                        team.rank <= 10 
-                          ? 'border-fpl-green text-fpl-green'
-                          : 'border-white/40 text-white'
-                      }`}>
-                        {team.rank <= 10 ? 'Top 10' : `#${team.rank}`}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => fetchTeamBreakdown(team.teamId, team.teamName)}
+                          className="text-white/70 hover:text-white hover:bg-white/10 p-2"
+                          title="View detailed breakdown"
+                        >
+                          <BarChart3 className="h-4 w-4" />
+                        </Button>
+                        <Badge variant="outline" className={`${
+                          team.rank <= 10 
+                            ? 'border-fpl-green text-fpl-green bg-fpl-green/10'
+                            : 'border-white/40 text-white'
+                        }`}>
+                          {team.rank <= 10 ? 'Top 10' : `#${team.rank}`}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -335,6 +398,19 @@ export function EnhancedLeaderboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Points Breakdown Modal */}
+      <PointsBreakdownModal
+        isOpen={isBreakdownModalOpen}
+        onClose={() => {
+          setIsBreakdownModalOpen(false);
+          setBreakdownData(null);
+          setSelectedTeamName('');
+        }}
+        teamBreakdown={breakdownData}
+        loading={breakdownLoading}
+        userName={selectedTeamName}
+      />
     </div>
   );
 }

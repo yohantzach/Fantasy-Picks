@@ -108,25 +108,68 @@ export class FPLScoringService {
   }
 
   /**
-   * Check if it's time to calculate scores (1 hour after last fixture)
+   * Check if it's time to calculate scores (daily updates after matches start)
    */
   async shouldCalculateScores(gameweekNumber: number): Promise<boolean> {
     try {
-      // Check if all fixtures are finished
-      const allFinished = await this.areAllFixturesFinished(gameweekNumber);
-      if (!allFinished) return false;
+      const response = await fetch(`${this.baseUrl}/fixtures/?event=${gameweekNumber}`);
+      const fixtures: FPLFixture[] = await response.json();
+      
+      if (fixtures.length === 0) return false;
 
-      // Get the last fixture kickoff time
-      const lastKickoffTime = await this.getLastFixtureKickoffTime(gameweekNumber);
-      if (!lastKickoffTime) return false;
+      // Check if any fixtures have finished
+      const hasFinishedFixtures = fixtures.some(fixture => fixture.finished);
+      
+      if (!hasFinishedFixtures) return false;
 
-      // Add 3 hours to account for match duration + 1 hour buffer
-      const scoringTime = new Date(lastKickoffTime.getTime() + (4 * 60 * 60 * 1000));
+      // Get the latest finished fixture's kickoff time
+      const finishedFixtures = fixtures.filter(fixture => fixture.finished);
+      const latestFinishedFixture = finishedFixtures.reduce((latest, current) => {
+        const currentKickoff = new Date(current.kickoff_time);
+        const latestKickoff = new Date(latest.kickoff_time);
+        return currentKickoff > latestKickoff ? current : latest;
+      });
+
+      // Wait 2 hours after the latest finished match started before scoring
+      const scoringTime = new Date(new Date(latestFinishedFixture.kickoff_time).getTime() + (2 * 60 * 60 * 1000));
       const now = new Date();
 
       return now >= scoringTime;
     } catch (error) {
       console.error('Error checking if should calculate scores:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if gameweek is truly finished (ALL fixtures completed)
+   */
+  async isGameweekFinished(gameweekNumber: number): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/fixtures/?event=${gameweekNumber}`);
+      const fixtures: FPLFixture[] = await response.json();
+      
+      if (fixtures.length === 0) return false;
+
+      // Check if ALL fixtures are finished
+      const allFinished = fixtures.every(fixture => fixture.finished);
+      
+      if (!allFinished) return false;
+
+      // Get the last fixture's kickoff time
+      const lastFixture = fixtures.reduce((latest, current) => {
+        const currentKickoff = new Date(current.kickoff_time);
+        const latestKickoff = new Date(latest.kickoff_time);
+        return currentKickoff > latestKickoff ? current : latest;
+      });
+
+      // Wait 2 hours after the last match started before marking as finished
+      const finishTime = new Date(new Date(lastFixture.kickoff_time).getTime() + (2 * 60 * 60 * 1000));
+      const now = new Date();
+
+      return now >= finishTime;
+    } catch (error) {
+      console.error('Error checking if gameweek is finished:', error);
       return false;
     }
   }
@@ -248,7 +291,7 @@ export class FPLScoringService {
   /**
    * Calculate scores for a specific team
    */
-  async calculateTeamScore(teamId: number, gameweekNumber: number): Promise<TeamScoreResult | null> {
+  async calculateTeamScore(teamId: number, gameweekNumber: number, isFinalCalculation: boolean = false): Promise<TeamScoreResult | null> {
     try {
       // Get team details
       const team = await db.select()
@@ -270,12 +313,12 @@ export class FPLScoringService {
       let teamPlayers = [];
       
       // Try to get detailed player info from playerSelections table
-      const playerSelections = await db.select()
+      const playerSelectionsData = await db.select()
         .from(playerSelections)
         .where(eq(playerSelections.teamId, teamId));
 
-      if (playerSelections.length > 0) {
-        teamPlayers = playerSelections.map(ps => ({
+      if (playerSelectionsData.length > 0) {
+        teamPlayers = playerSelectionsData.map(ps => ({
           playerId: ps.fplPlayerId,
           playerName: ps.playerName,
           position: ps.position,
@@ -313,16 +356,18 @@ export class FPLScoringService {
         };
       });
 
-      // Handle captain logic (captain gets double points, vice-captain becomes captain if captain plays 0 minutes)
+      // Handle captain logic
       let captain = playerScores.find(p => p.isCaptain);
       let viceCaptain = playerScores.find(p => p.isViceCaptain);
-
       let effectiveCaptain = captain;
 
-      // If captain played 0 minutes, make vice-captain the effective captain
-      if (captain && captain.points === 0 && viceCaptain && viceCaptain.points > 0) {
+      // Only switch captain to vice-captain in FINAL calculation when gameweek is complete
+      if (isFinalCalculation && captain && captain.points === 0 && viceCaptain && viceCaptain.points > 0) {
         effectiveCaptain = viceCaptain;
-        console.log(`Team ${teamId}: Captain played 0 minutes, vice-captain becomes effective captain`);
+        console.log(`Team ${teamId}: FINAL CALCULATION - Captain played 0 minutes, vice-captain becomes effective captain`);
+      } else if (!isFinalCalculation) {
+        // During live updates, always use the original captain
+        effectiveCaptain = captain;
       }
 
       // Apply captain bonus (double points)
@@ -379,6 +424,228 @@ export class FPLScoringService {
 
       console.log(`Found ${gameweekTeams.length} teams for gameweek ${gameweek.gameweekNumber}`);
 
+      // Check if gameweek is truly finished (all fixtures completed)
+      const gameweekFinished = await this.isGameweekFinished(gameweek.gameweekNumber);
+      
+      // Calculate scores for all teams
+      const teamScores: TeamScoreResult[] = [];
+      
+      for (const team of gameweekTeams) {
+        console.log(`Calculating ${gameweekFinished ? 'FINAL' : 'LIVE'} scores for team ${team.id} (${team.teamName})...`);
+        const scoreResult = await this.calculateTeamScore(team.id, gameweek.gameweekNumber, gameweekFinished);
+        
+        if (scoreResult) {
+          teamScores.push(scoreResult);
+          
+          // Update team total points in database
+          await db.update(teams)
+            .set({ totalPoints: scoreResult.totalPoints })
+            .where(eq(teams.id, team.id));
+
+          // Update individual player points if we have playerSelections
+          for (const playerScore of scoreResult.playerScores) {
+            await db.update(playerSelections)
+              .set({ gameweekPoints: playerScore.points })
+              .where(and(
+                eq(playerSelections.teamId, team.id),
+                eq(playerSelections.fplPlayerId, playerScore.playerId)
+              ));
+          }
+        }
+      }
+
+      // Sort teams by total points and assign ranks
+      teamScores.sort((a, b) => b.totalPoints - a.totalPoints);
+
+      // Clear existing gameweek results
+      await db.delete(gameweekResults)
+        .where(eq(gameweekResults.gameweekId, gameweekId));
+
+      // Save gameweek results
+      for (let i = 0; i < teamScores.length; i++) {
+        const teamScore = teamScores[i];
+        await storage.createGameweekResult({
+          gameweekId,
+          userId: teamScore.userId,
+          teamId: teamScore.teamId,
+          totalPoints: teamScore.totalPoints,
+          rank: i + 1
+        });
+      }
+
+      // Mark gameweek as completed only if ALL fixtures are truly finished
+      if (gameweekFinished && !gameweek.isCompleted) {
+        await storage.updateGameweekStatus(gameweekId, true);
+        console.log(`🏆 Gameweek ${gameweek.gameweekNumber} marked as COMPLETED - all fixtures finished!`);
+      } else if (!gameweekFinished) {
+        console.log(`📊 Live update for gameweek ${gameweek.gameweekNumber} - matches still ongoing`);
+      }
+
+      console.log(`Score calculation completed for gameweek ${gameweek.gameweekNumber}. Processed ${teamScores.length} teams.`);
+      this.lastScoringTime = Date.now();
+
+      return teamScores;
+    } catch (error) {
+      console.error('Error calculating gameweek scores:', error);
+      throw error;
+    } finally {
+      this.scoringInProgress = false;
+    }
+  }
+
+  /**
+   * Check if we should run scoring for a gameweek (daily rate limiting)
+   */
+  private hasGameweekBeenScoredRecently(gameweekId: number): boolean {
+    const lastScored = this.dailyScoringTracker.get(gameweekId);
+    if (!lastScored) return false;
+    
+    // Check if we've scored within the last 20 hours (once per day)
+    const twentyHoursAgo = Date.now() - (20 * 60 * 60 * 1000);
+    return lastScored > twentyHoursAgo;
+  }
+
+  /**
+   * Check if any matches have started for a gameweek
+   */
+  private async haveMatchesStarted(gameweekNumber: number): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/fixtures/?event=${gameweekNumber}`);
+      const fixtures: FPLFixture[] = await response.json();
+      
+      // Check if any fixture has started (kickoff time has passed)
+      const now = new Date();
+      return fixtures.some(fixture => {
+        const kickoffTime = new Date(fixture.kickoff_time);
+        return now > kickoffTime;
+      });
+    } catch (error) {
+      console.error('Error checking if matches started:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Run scheduled scoring check (hourly)
+   */
+  private async runScheduledScoring() {
+    try {
+      const currentGameweek = await storage.getCurrentGameweek();
+      if (!currentGameweek || currentGameweek.isCompleted) {
+        return;
+      }
+
+      // Check if we've already scored this gameweek recently (rate limiting)
+      if (this.hasGameweekBeenScoredRecently(currentGameweek.id)) {
+        return;
+      }
+
+      // Check if matches have started for this gameweek
+      const matchesStarted = await this.haveMatchesStarted(currentGameweek.gameweekNumber);
+      if (!matchesStarted) {
+        console.log(`⏳ GW${currentGameweek.gameweekNumber}: Matches haven't started yet`);
+        return;
+      }
+
+      // Check if we should calculate scores (after matches finish)
+      const shouldCalculate = await this.shouldCalculateScores(currentGameweek.gameweekNumber);
+      if (!shouldCalculate) {
+        console.log(`⏳ GW${currentGameweek.gameweekNumber}: Matches still in progress, waiting...`);
+        return;
+      }
+
+      console.log(`🎯 GW${currentGameweek.gameweekNumber}: Daily scoring update starting...`);
+      await this.calculateGameweekScores(currentGameweek.id);
+      
+      // Mark that we've scored this gameweek recently
+      this.dailyScoringTracker.set(currentGameweek.id, Date.now());
+      
+    } catch (error) {
+      console.error('Error in scheduled scoring:', error);
+    }
+  }
+
+  /**
+   * Start automatic scoring process - runs hourly and scores once per day
+   */
+  startAutoScoring() {
+    console.log('🚀 Starting FPL automatic scoring service...');
+    console.log('📅 Scoring will run ONCE PER DAY after matches start, with FINAL calculation when all matches finish');
+    
+    // Check every hour for scoring opportunities
+    this.scoringInterval = setInterval(() => {
+      this.runScheduledScoring();
+    }, 60 * 60 * 1000); // Every hour
+    
+    // Run initial check after 30 seconds
+    setTimeout(() => this.runScheduledScoring(), 30000);
+  }
+
+  /**
+   * Stop the automatic scoring service
+   */
+  stopAutoScoring() {
+    if (this.scoringInterval) {
+      clearInterval(this.scoringInterval);
+      this.scoringInterval = undefined;
+      console.log('🛑 Stopped FPL automatic scoring service');
+    }
+  }
+
+  /**
+   * Manual trigger for score calculation (for testing/admin use)
+   */
+  async triggerScoreCalculation(gameweekId?: number): Promise<TeamScoreResult[]> {
+    try {
+      let targetGameweekId = gameweekId;
+      
+      if (!targetGameweekId) {
+        const currentGameweek = await storage.getCurrentGameweek();
+        if (!currentGameweek) {
+          throw new Error('No active gameweek found');
+        }
+        targetGameweekId = currentGameweek.id;
+      }
+
+      console.log(`Manual score calculation triggered for gameweek ${targetGameweekId}`);
+      
+      // Force manual calculation by bypassing time checks
+      return await this.calculateGameweekScoresManual(targetGameweekId);
+    } catch (error) {
+      console.error('Error in manual score calculation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate scores for all teams in a gameweek (manual version - bypasses time checks)
+   */
+  private async calculateGameweekScoresManual(gameweekId: number): Promise<TeamScoreResult[]> {
+    if (this.scoringInProgress) {
+      console.log('Scoring already in progress, skipping...');
+      return [];
+    }
+
+    try {
+      this.scoringInProgress = true;
+      console.log(`Starting MANUAL score calculation for gameweek ${gameweekId}...`);
+
+      // Get gameweek details
+      const gameweek = await storage.getGameweek(gameweekId);
+      if (!gameweek) {
+        throw new Error(`Gameweek ${gameweekId} not found`);
+      }
+
+      // Skip time checks for manual calculation
+      console.log(`Manual calculation: Skipping time checks for gameweek ${gameweek.gameweekNumber}`);
+
+      // Get all teams for this gameweek
+      const gameweekTeams = await db.select()
+        .from(teams)
+        .where(eq(teams.gameweekId, gameweekId));
+
+      console.log(`Found ${gameweekTeams.length} teams for gameweek ${gameweek.gameweekNumber}`);
+
       // Calculate scores for all teams
       const teamScores: TeamScoreResult[] = [];
       
@@ -425,140 +692,22 @@ export class FPLScoringService {
         });
       }
 
-      // Mark gameweek as completed
-      await storage.updateGameweekStatus(gameweekId, true);
+      // Mark gameweek as completed only if all fixtures are finished
+      const allFixturesFinished = await this.areAllFixturesFinished(gameweek.gameweekNumber);
+      if (allFixturesFinished && !gameweek.isCompleted) {
+        await storage.updateGameweekStatus(gameweekId, true);
+        console.log(`🏆 Gameweek ${gameweek.gameweekNumber} marked as completed - all fixtures finished!`);
+      }
 
-      console.log(`Score calculation completed for gameweek ${gameweek.gameweekNumber}. Processed ${teamScores.length} teams.`);
+      console.log(`MANUAL score calculation completed for gameweek ${gameweek.gameweekNumber}. Processed ${teamScores.length} teams.`);
       this.lastScoringTime = Date.now();
 
       return teamScores;
     } catch (error) {
-      console.error('Error calculating gameweek scores:', error);
+      console.error('Error calculating gameweek scores (manual):', error);
       throw error;
     } finally {
       this.scoringInProgress = false;
-    }
-  }
-
-  /**
-   * Check if we should run scoring for a gameweek (only once per day after matches start)
-   */
-  private hasGameweekBeenScoredToday(gameweekId: number): boolean {
-    const lastScored = this.dailyScoringTracker.get(gameweekId);
-    if (!lastScored) return false;
-    
-    // Check if we've scored within the last 20 hours
-    const twentyHoursAgo = Date.now() - (20 * 60 * 60 * 1000);
-    return lastScored > twentyHoursAgo;
-  }
-
-  /**
-   * Check if any matches have started for a gameweek
-   */
-  private async haveMatchesStarted(gameweekNumber: number): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/fixtures/?event=${gameweekNumber}`);
-      const fixtures: FPLFixture[] = await response.json();
-      
-      // Check if any fixture has started (kickoff time has passed)
-      const now = new Date();
-      return fixtures.some(fixture => {
-        const kickoffTime = new Date(fixture.kickoff_time);
-        return now > kickoffTime;
-      });
-    } catch (error) {
-      console.error('Error checking if matches started:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Run scheduled scoring check (hourly)
-   */
-  private async runScheduledScoring() {
-    try {
-      const currentGameweek = await storage.getCurrentGameweek();
-      if (!currentGameweek || currentGameweek.isCompleted) {
-        return;
-      }
-
-      // Check if we've already scored this gameweek today
-      if (this.hasGameweekBeenScoredToday(currentGameweek.id)) {
-        return;
-      }
-
-      // Check if matches have started for this gameweek
-      const matchesStarted = await this.haveMatchesStarted(currentGameweek.gameweekNumber);
-      if (!matchesStarted) {
-        console.log(`⏳ GW${currentGameweek.gameweekNumber}: Matches haven't started yet`);
-        return;
-      }
-
-      // Check if we should calculate scores (after matches finish)
-      const shouldCalculate = await this.shouldCalculateScores(currentGameweek.gameweekNumber);
-      if (!shouldCalculate) {
-        console.log(`⏳ GW${currentGameweek.gameweekNumber}: Matches still in progress, waiting...`);
-        return;
-      }
-
-      console.log(`🎯 GW${currentGameweek.gameweekNumber}: All matches finished, calculating scores...`);
-      await this.calculateGameweekScores(currentGameweek.id);
-      
-      // Mark that we've scored this gameweek today
-      this.dailyScoringTracker.set(currentGameweek.id, Date.now());
-      
-    } catch (error) {
-      console.error('Error in scheduled scoring:', error);
-    }
-  }
-
-  /**
-   * Start automatic scoring process - runs hourly but scores only once per day after matches
-   */
-  startAutoScoring() {
-    console.log('🚀 Starting FPL automatic scoring service...');
-    console.log('📅 Scoring will run ONCE PER DAY after all matches in a gameweek are completed');
-    
-    // Check every hour for scoring opportunities
-    this.scoringInterval = setInterval(() => {
-      this.runScheduledScoring();
-    }, 60 * 60 * 1000); // Every hour
-    
-    // Run initial check after 30 seconds
-    setTimeout(() => this.runScheduledScoring(), 30000);
-  }
-
-  /**
-   * Stop the automatic scoring service
-   */
-  stopAutoScoring() {
-    if (this.scoringInterval) {
-      clearInterval(this.scoringInterval);
-      this.scoringInterval = undefined;
-      console.log('🛑 Stopped FPL automatic scoring service');
-    }
-  }
-
-  /**
-   * Manual trigger for score calculation (for testing/admin use)
-   */
-  async triggerScoreCalculation(gameweekId?: number): Promise<TeamScoreResult[]> {
-    try {
-      let targetGameweekId = gameweekId;
-      
-      if (!targetGameweekId) {
-        const currentGameweek = await storage.getCurrentGameweek();
-        if (!currentGameweek) {
-          throw new Error('No active gameweek found');
-        }
-        targetGameweekId = currentGameweek.id;
-      }
-
-      console.log(`Manual score calculation triggered for gameweek ${targetGameweekId}`);
-      return await this.calculateGameweekScores(targetGameweekId);
-    } catch (error) {
-      console.error('Error in manual score calculation:', error);
-      throw error;
     }
   }
 }

@@ -28,26 +28,18 @@ export default function EditTeam() {
   const [isModified, setIsModified] = useState(false);
   const [activeTeamTab, setActiveTeamTab] = useState<string>("1");
 
-  // Fetch current gameweek
-  const { data: currentGameweek } = useQuery({
-    queryKey: ["/api/gameweek/current"],
-  });
-
-  // Get team number from URL parameters
+  // Get team number from URL parameter
   const urlParams = new URLSearchParams(window.location.search);
   const teamNumberFromUrl = urlParams.get('team');
-  
-  // Fetch all user's teams (up to 5)
-  const { data: userTeams = [], isLoading: teamsLoading } = useQuery({
+
+  // Fetch user teams
+  const { data: userTeams = [], isLoading: teamsLoading } = useQuery<any[]>({
     queryKey: ["/api/teams/user"],
   });
-  
-  // Sort teams by team number and group by payment status
-  const sortedTeams = [...userTeams].sort((a, b) => a.teamNumber - b.teamNumber);
-  const approvedTeams = sortedTeams.filter(team => team.paymentStatus === 'approved');
-  const pendingTeams = sortedTeams.filter(team => team.paymentStatus === 'pending');
-  const rejectedTeams = sortedTeams.filter(team => team.paymentStatus === 'rejected');
-  const notSubmittedTeams = sortedTeams.filter(team => team.paymentStatus === 'not_submitted');
+
+  // Process teams data
+  const sortedTeams = userTeams.sort((a: any, b: any) => a.teamNumber - b.teamNumber);
+  const approvedTeams = sortedTeams.filter((team: any) => team.paymentStatus === 'approved');
   
   // Initialize active team tab based on URL param or first approved team
   React.useEffect(() => {
@@ -61,7 +53,7 @@ export default function EditTeam() {
   }, [teamNumberFromUrl, approvedTeams, sortedTeams]);
   
   const currentTeamNumber = parseInt(activeTeamTab);
-  const currentTeamData = sortedTeams.find(team => team.teamNumber === currentTeamNumber);
+  const currentTeamData = sortedTeams.find((team: any) => team.teamNumber === currentTeamNumber);
   
   // Fetch specific team data for the active tab
   const { data: currentTeam, isLoading: teamLoading } = useQuery({
@@ -72,12 +64,17 @@ export default function EditTeam() {
   });
 
   // Fetch FPL data
-  const { data: players = [] } = useQuery({
+  const { data: players = [] } = useQuery<any[]>({
     queryKey: ["/api/fpl/players"],
   });
 
-  const { data: fplTeams = [] } = useQuery({
+  const { data: fplTeams = [] } = useQuery<any[]>({
     queryKey: ["/api/fpl/teams"],
+  });
+
+  // Fetch current gameweek
+  const { data: currentGameweek } = useQuery<any>({
+    queryKey: ["/api/gameweek/current"],
   });
 
   // Load current team data when team data changes
@@ -85,8 +82,8 @@ export default function EditTeam() {
     // Reset state when switching teams
     if (currentTeamNumber && (!selectedPlayers.length || selectedPlayers.length === 0)) {
       // Load from currentTeamData (teams list) immediately if available
-      if (currentTeamData && currentTeamData.players && Array.isArray(currentTeamData.players) && currentTeamData.players.length > 0 && players.length > 0) {
-        const playerIds = currentTeamData.players.map((id: any) => parseInt(id.toString())).filter(id => !isNaN(id));
+      if (currentTeamData && currentTeamData.players && Array.isArray(currentTeamData.players) && currentTeamData.players.length > 0 && Array.isArray(players) && players.length > 0) {
+        const playerIds = currentTeamData.players.map((id: any) => parseInt(id.toString())).filter((id: number) => !isNaN(id));
         const validPlayerIds = playerIds.filter((id: number) => players.some((p: any) => p.id === id));
         
         if (validPlayerIds.length > 0) {
@@ -106,8 +103,8 @@ export default function EditTeam() {
         }
       }
       // Also try loading from individual team API if available
-      else if (currentTeam && currentTeam.players && Array.isArray(currentTeam.players) && currentTeam.players.length > 0 && players.length > 0) {
-        const playerIds = currentTeam.players.map((id: any) => parseInt(id.toString())).filter(id => !isNaN(id));
+      else if (currentTeam && currentTeam.players && Array.isArray(currentTeam.players) && currentTeam.players.length > 0 && Array.isArray(players) && players.length > 0) {
+        const playerIds = currentTeam.players.map((id: any) => parseInt(id.toString())).filter((id: number) => !isNaN(id));
         const validPlayerIds = playerIds.filter((id: number) => players.some((p: any) => p.id === id));
         
         if (validPlayerIds.length > 0) {
@@ -134,7 +131,7 @@ export default function EditTeam() {
     if (currentTeam) {
       // Get original player IDs for comparison
       const originalPlayerIds = Array.isArray(currentTeam.players) 
-        ? currentTeam.players.map(p => typeof p === 'object' ? p.fplPlayerId : p)
+        ? currentTeam.players.map((p: any) => typeof p === 'object' ? p.fplPlayerId : p)
         : [];
         
       const hasChanges = 
@@ -163,15 +160,17 @@ export default function EditTeam() {
   };
 
   const totalCost = useMemo(() => {
-    const selectedPlayerObjs = players.filter(p => selectedPlayers.includes(p.id));
-    return selectedPlayerObjs.reduce((sum, p) => sum + p.now_cost, 0);
+    if (!Array.isArray(players)) return 0;
+    const selectedPlayerObjs = players.filter((p: any) => selectedPlayers.includes(p.id));
+    return selectedPlayerObjs.reduce((sum: number, p: any) => sum + p.now_cost, 0);
   }, [selectedPlayers, players]);
 
   const remainingBudget = 1000 - totalCost; // 100.0m budget in API units
 
   // Validate team constraints
   const validatePlayerSelection = (playerId: number, isAdding: boolean) => {
-    const player = players.find(p => p.id === playerId);
+    if (!Array.isArray(players)) return false;
+    const player = players.find((p: any) => p.id === playerId);
     if (!player) return false;
 
     if (isAdding) {
@@ -196,8 +195,8 @@ export default function EditTeam() {
       }
 
       // Check position limits
-      const currentPositionCount = selectedPlayers.filter(id => {
-        const p = players.find(p => p.id === id);
+      const currentPositionCount = selectedPlayers.filter((id: number) => {
+        const p = Array.isArray(players) ? players.find((p: any) => p.id === id) : null;
         return p?.element_type === player.element_type;
       }).length;
 
@@ -216,8 +215,8 @@ export default function EditTeam() {
       }
 
       // Check team limit (max 3 from same team)
-      const sameTeamCount = selectedPlayers.filter(id => {
-        const p = players.find(p => p.id === id);
+      const sameTeamCount = selectedPlayers.filter((id: number) => {
+        const p = Array.isArray(players) ? players.find((p: any) => p.id === id) : null;
         return p?.team === player.team;
       }).length;
 
@@ -330,13 +329,64 @@ export default function EditTeam() {
   };
 
   const isDeadlinePassed = currentGameweek?.deadline ? new Date() > new Date(currentGameweek.deadline) : false;
-  const canEdit = currentTeam?.canEdit || (currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed);
+  const isGameweekInProgress = currentGameweek && !currentGameweek.isCompleted && isDeadlinePassed;
+  const canEdit = currentTeam?.canEdit || (currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed && !isGameweekInProgress);
   const paymentStatus = currentTeam?.paymentStatus || currentTeamData?.paymentStatus;
-  const isLocked = currentTeam?.isLocked || isDeadlinePassed || !canEdit;
+  const isLocked = currentTeam?.isLocked || isDeadlinePassed || !canEdit || isGameweekInProgress;
   
   // Check if user has access to edit teams (payment must be approved)
-  const hasEditAccess = currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed;
+  const hasEditAccess = currentTeamData?.paymentStatus === 'approved' && !isDeadlinePassed && !isGameweekInProgress;
   const teamExists = currentTeam && currentTeam.players && currentTeam.players.length > 0;
+
+  // Show lock screen if gameweek is in progress
+  if (isGameweekInProgress) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-fpl-purple via-fpl-purple-light to-fpl-purple-dark">
+        <Navigation />
+        <div className="responsive-container padding-responsive">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Card className="w-full max-w-lg border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+              <CardContent className="p-8 text-center">
+                <div className="mb-6">
+                  <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    Gameweek {currentGameweek.gameweekNumber} In Progress
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    Team editing is locked while matches are being played.
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    You can edit teams again when:
+                  </p>
+                  <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    <li>• All matches finish</li>
+                    <li>• Final scores are calculated</li>
+                    <li>• Next gameweek opens</li>
+                  </ul>
+                </div>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => window.location.href = '/leaderboard'}
+                    className="w-full bg-fpl-green hover:bg-fpl-green/90 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    View Live Leaderboard
+                  </button>
+                  <button 
+                    onClick={() => window.location.href = '/fixtures'}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    View Fixtures
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   // Update URL when switching tabs and reset selected players
   const handleTabChange = (teamNumber: string) => {
@@ -777,7 +827,7 @@ export default function EditTeam() {
                 </CardHeader>
                 <CardContent className="px-2 sm:px-4 lg:px-6">
                   <FormationPitch
-                    players={players}
+                    players={Array.isArray(players) ? players : []}
                     selectedPlayers={selectedPlayers}
                     onPositionClick={handlePositionClick}
                     captainId={captainId}
@@ -939,9 +989,9 @@ export default function EditTeam() {
           /* Player Selection Table */
           <div className="space-y-6">
             <EnhancedPlayerSelectionTable
-              players={players || []}
-              fplTeams={fplTeams || []}
-              elementType={showPlayerTable}
+              players={Array.isArray(players) ? players : []}
+              fplTeams={Array.isArray(fplTeams) ? fplTeams : []}
+              elementType={showPlayerTable || 1}
               selectedPlayers={selectedPlayers}
               onPlayerToggle={handlePlayerToggle}
               onPlayerStats={setSelectedPlayerForStats}
